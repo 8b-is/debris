@@ -9,6 +9,7 @@ import {
   closeSync,
   existsSync,
   mkdirSync,
+  fsyncSync,
   openSync,
   readFileSync,
   renameSync,
@@ -130,11 +131,27 @@ export class EntitlementStore {
     const fd = openSync(tmp, "w", LEDGER_FILE_MODE);
     try {
       writeSync(fd, payload);
+      // Without the sync, the rename can reach disk before the bytes do, and a
+      // power loss leaves a valid but empty ledger. That is a silent loss of
+      // every entitlement.
+      fsyncSync(fd);
     } finally {
       closeSync(fd);
     }
     // Same directory, so this is a rename rather than a copy.
     renameSync(tmp, this.file);
+
+    // Sync the directory too, so the rename itself is durable.
+    let dirFd: number | undefined;
+    try {
+      dirFd = openSync(dir, "r");
+      fsyncSync(dirFd);
+    } catch {
+      // Some platforms refuse to fsync a directory. The file sync above is the
+      // load-bearing one; this is best effort.
+    } finally {
+      if (dirFd !== undefined) closeSync(dirFd);
+    }
   }
 }
 

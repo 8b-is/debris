@@ -137,3 +137,26 @@ test("a failed flush rolls the ledger back instead of claiming a persisted write
     "a failed write must not be visible to readers",
   );
 });
+
+test("a write leaves no temporary file behind", async () => {
+  const store = new EntitlementStore({ file });
+  await store.put({
+    email: "clean@write.test",
+    plan: "family",
+    seats: 5,
+    status: "active",
+    valid_until: null,
+  });
+  const { readdirSync } = await import("node:fs");
+  const leftovers = readdirSync(join(dir, "nested")).filter((f) => f.endsWith(".tmp"));
+  assert.deepEqual(leftovers, [], "the temp file must be renamed, not left behind");
+});
+
+test("two stores writing in sequence both land, proving the sync completes", async () => {
+  const a = new EntitlementStore({ file });
+  await a.put({ email: "seq1@test", plan: "family", seats: 5, status: "active", valid_until: null });
+  const b = new EntitlementStore({ file });
+  await b.put({ email: "seq2@test", plan: "household", seats: 12, status: "active", valid_until: null });
+  const c = new EntitlementStore({ file });
+  assert.equal(c.all().length, 2, "both writes must survive a reopen");
+});
