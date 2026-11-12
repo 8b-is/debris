@@ -47,6 +47,10 @@ node server/src/server.ts    # serves on PORT, default 8787
 - **No media bytes, ever.** This is the service's whole legal posture. Do not add a
   transcode path, a relay, or a cache of anything larger than a configuration
   document.
+- **The API is unauthenticated, and that is a deployment gate.** `GET /api/entitlement`
+  and `GET /api/bundle` take an email and return a record with no auth check. It is
+  survivable only because the service is not deployed and nothing here holds a
+  credential. **Do not deploy without device tokens.** See `docs/adr/0005`.
 - **A bundle never carries the credential.** `createBundle` has no token field, and
   `manifest.test.ts` asserts the serialised bundle contains no `token`, `credential`,
   `secret`, `api_key`, or `password`. Do not add one "for convenience"; the credential
@@ -64,7 +68,7 @@ server/src/webhook.ts     HMAC-SHA256 verification and event dispatch
 server/src/server.ts      the five routes
 server/test/              72 offline tests, including landing and README parity
 landing/                  static page: index.html, landing.css, tokens.css, app.js
-docs/adr/                 the four decisions, each with what would change it
+docs/adr/                 the five decisions, each with what would change it
 docs/ELI5.md              what it is, for a ten-year-old
 plans/SPEC.md             the build contract
 ```

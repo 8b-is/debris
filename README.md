@@ -219,6 +219,13 @@ What is built: the entitlement ledger, the tier table, the addon manifest, the
 configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
 HMAC-verified webhooks that fail closed. 72 tests, offline.
 
+**The entitlement and bundle routes have no authentication.** Anyone who knows a
+family member's email can read their plan and request a bundle in their name. The
+ledger holds no credential and a bundle carries none, but this is still an
+enumeration oracle, and it is why the service is not deployed anywhere. The reasoning
+and the expiry condition are in
+[ADR 0005](docs/adr/0005-unauthenticated-until-deployed.md).
+
 What is not built: **the credential broker** — nothing in this service stores a
 debrid token yet. The bundle is the shape it will hand out, and the bundle
 deliberately has no token field, so the day the credential store lands it cannot
