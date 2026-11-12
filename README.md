@@ -164,6 +164,7 @@ these and on nothing else:
 | 400 | `device_required` | a device revoke asked without an id or a secret |
 | 401 | `invalid_device_secret` | a device secret was offered and did not match that email |
 | 402 | `payment_required` | bundle asked for a record that is free, lapsed, or past due |
+| 403 | `enrolment_required` | a new device registered without a valid family enrolment code |
 | 403 | `seat_limit_reached` | every seat is taken and the caller is not a known device |
 | 404 | `not_found` | unknown route |
 | 404 | `unknown_device` | no device with that id, or the secret does not match |
@@ -234,6 +235,12 @@ configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
 HMAC-verified webhooks that fail closed, an audit line for every entitlement change,
 and a restart that drains in-flight grants instead of dropping them. 114 tests,
 offline.
+
+**A new device must prove it belongs to the family.** Knowing an email is not proof:
+without this, anyone could fill every seat with junk and lock the family's own
+television out. The first subscription grant prints a one-time enrolment code; a
+device registering for the first time passes it as `&enrolment=`. It is stored hashed,
+like a device secret, and never shown again.
 
 **Seats are now enforced, by device.** A device is one physical thing that asks for a
 bundle. The first request registers it and receives a secret once; later requests

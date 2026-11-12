@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 
-import { DeviceRegistry } from "../src/devices.ts";
+import { DeviceRegistry, hashSecret } from "../src/devices.ts";
 import { EntitlementStore } from "../src/store.ts";
 import { startServer, type DebrisServer } from "../src/server.ts";
 
@@ -45,6 +45,31 @@ async function fakeStripeFetch(
       url: `https://checkout.stripe.test/c/cs_test_123?plan=${new URLSearchParams(init.body).get("client_reference_id")}`,
     }),
   };
+}
+
+/**
+ * A record that can register devices: an enrolment hash and the code it came from.
+ *
+ * First-time device registration now requires the family code, because without it
+ * anyone who knows an email could fill every seat with junk.
+ */
+async function enrol(
+  store: EntitlementStore,
+  email: string,
+  plan: "family" | "household" | "patron" = "household",
+  seats = 12,
+): Promise<{ code: string }> {
+  const { hashSecret, newEnrolmentCode } = await import("../src/devices.ts");
+  const code = newEnrolmentCode();
+  await store.put({
+    email,
+    plan,
+    seats,
+    status: "active",
+    valid_until: null,
+    enrolment_hash: hashSecret(code),
+  });
+  return { code };
 }
 
 async function call(
@@ -258,6 +283,7 @@ test("a paid record gets a bundle with addons and no credential", async () => {
     seats: 12,
     status: "active",
     valid_until: null,
+    enrolment_hash: hashSecret("TESTCODE"),
   });
   const paid = await startServer(0, {
     store,
@@ -266,7 +292,7 @@ test("a paid record gets a bundle with addons and no credential", async () => {
   });
   try {
     // First request registers the device and receives its secret once.
-    const first = await fetch(`${paid.url}/api/bundle?email=paid@test&device=Living+room`);
+    const first = await fetch(`${paid.url}/api/bundle?email=paid@test&device=Living+room&enrolment=TESTCODE`);
     assert.equal(first.status, 200);
     const issued = await first.json();
     assert.equal(issued.tier, "household");
@@ -425,7 +451,7 @@ test("an expired customer cannot pull a bundle, and can still pay again", async 
 test("a device secret from one email does not work for another", async () => {
   const store = new EntitlementStore({ file: join(dir, "cross.json") });
   for (const [email, plan] of [["a@x.test", "household"], ["b@x.test", "family"]] as const) {
-    await store.put({ email, plan, seats: 12, status: "active", valid_until: null });
+    await store.put({ email, plan, seats: 12, status: "active", valid_until: null, enrolment_hash: hashSecret("CODE" + email[0].toUpperCase()) });
   }
   const inst = await startServer(0, {
     store,
@@ -433,7 +459,7 @@ test("a device secret from one email does not work for another", async () => {
     devices: new DeviceRegistry(),
   });
   try {
-    const first = await fetch(`${inst.url}/api/bundle?email=a@x.test&device=TV`);
+    const first = await fetch(`${inst.url}/api/bundle?email=a@x.test&device=TV&enrolment=CODEA`);
     const { device_secret } = await first.json();
 
     const cross = await fetch(`${inst.url}/api/bundle?email=b@x.test`, {
@@ -450,17 +476,17 @@ test("a full house refuses a new device with seat_limit_reached", async () => {
   const store = new EntitlementStore({ file: join(dir, "seats.json") });
   await store.put({ email: "cap@test", plan: "free", seats: 1, status: "free", valid_until: null });
   // Give them one seat by making the plan household with 1 seat via the store.
-  await store.put({ email: "cap@test", plan: "family", seats: 1, status: "active", valid_until: null });
+  await store.put({ email: "cap@test", plan: "family", seats: 1, status: "active", valid_until: null, enrolment_hash: hashSecret("CODE1") });
   const inst = await startServer(0, {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: new DeviceRegistry(),
   });
   try {
-    const first = await fetch(`${inst.url}/api/bundle?email=cap@test&device=TV`);
+    const first = await fetch(`${inst.url}/api/bundle?email=cap@test&device=TV&enrolment=CODE1`);
     assert.equal(first.status, 200);
 
-    const second = await fetch(`${inst.url}/api/bundle?email=cap@test&device=Phone`);
+    const second = await fetch(`${inst.url}/api/bundle?email=cap@test&device=Phone&enrolment=CODE1`);
     assert.equal(second.status, 403, "the second device must not fit");
     assert.deepEqual(await second.json(), { error: "seat_limit_reached" });
   } finally {
@@ -470,7 +496,7 @@ test("a full house refuses a new device with seat_limit_reached", async () => {
 
 test("a device can free its own seat, and only its own", async () => {
   const store = new EntitlementStore({ file: join(dir, "revoke.json") });
-  await store.put({ email: "cap@test", plan: "household", seats: 2, status: "active", valid_until: null });
+  await store.put({ email: "cap@test", plan: "household", seats: 2, status: "active", valid_until: null, enrolment_hash: hashSecret("CODE1") });
   const reg = new DeviceRegistry();
   const inst = await startServer(0, {
     store,
@@ -478,9 +504,9 @@ test("a device can free its own seat, and only its own", async () => {
     devices: reg,
   });
   try {
-    const first = await fetch(`${inst.url}/api/bundle?email=cap@test&device=TV`);
+    const first = await fetch(`${inst.url}/api/bundle?email=cap@test&device=TV&enrolment=CODE1`);
     const { device_id, device_secret } = await first.json();
-    const second = await fetch(`${inst.url}/api/bundle?email=cap@test&device=Phone`);
+    const second = await fetch(`${inst.url}/api/bundle?email=cap@test&device=Phone&enrolment=CODE1`);
     assert.equal(second.status, 200);
     assert.equal(second.status, 200, "two seats fit");
 
@@ -503,7 +529,7 @@ test("a device can free its own seat, and only its own", async () => {
     assert.deepEqual(await ok.json(), { revoked: true, id: device_id });
 
     // The seat is free now.
-    const fourth = await fetch(`${inst.url}/api/bundle?email=cap@test&device=Tablet`);
+    const fourth = await fetch(`${inst.url}/api/bundle?email=cap@test&device=Tablet&enrolment=CODE1`);
     assert.equal(fourth.status, 200, "the freed seat must be usable");
   } finally {
     await inst.close();
@@ -552,15 +578,15 @@ test("two simultaneous checkouts create only one session", async () => {
 
 test("an operator can list which devices hold seats", async () => {
   const store = new EntitlementStore({ file: join(dir, "list.json") });
-  await store.put({ email: "cap@test", plan: "household", seats: 12, status: "active", valid_until: null });
+  await store.put({ email: "cap@test", plan: "household", seats: 12, status: "active", valid_until: null, enrolment_hash: hashSecret("CODE1") });
   const inst = await startServer(0, {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: new DeviceRegistry(),
   });
   try {
-    await fetch(`${inst.url}/api/bundle?email=cap@test&device=Living+room`);
-    await fetch(`${inst.url}/api/bundle?email=cap@test&device=Kitchen`);
+    await fetch(`${inst.url}/api/bundle?email=cap@test&device=Living+room&enrolment=CODE1`);
+    await fetch(`${inst.url}/api/bundle?email=cap@test&device=Kitchen&enrolment=CODE1`);
 
     const res = await fetch(`${inst.url}/api/devices?email=cap@test`);
     assert.equal(res.status, 200);
@@ -595,7 +621,7 @@ test("a device list for an unknown email is 404, and without an email is 400", a
 
 test("the sweep reclaims a seat from a device that stopped checking in", async () => {
   const store = new EntitlementStore({ file: join(dir, "sweep.json") });
-  await store.put({ email: "cap@test", plan: "household", seats: 2, status: "active", valid_until: null });
+  await store.put({ email: "cap@test", plan: "household", seats: 2, status: "active", valid_until: null, enrolment_hash: hashSecret("CODE1") });
   const reg = new DeviceRegistry();
   const inst = await startServer(0, {
     store,
@@ -603,8 +629,8 @@ test("the sweep reclaims a seat from a device that stopped checking in", async (
     devices: reg,
   });
   try {
-    await fetch(`${inst.url}/api/bundle?email=cap@test&device=Gone`);
-    await fetch(`${inst.url}/api/bundle?email=cap@test&device=Here`);
+    await fetch(`${inst.url}/api/bundle?email=cap@test&device=Gone&enrolment=CODE1`);
+    await fetch(`${inst.url}/api/bundle?email=cap@test&device=Here&enrolment=CODE1`);
 
     // Backdate one device to make it stale.
     for (const d of reg.all()) {
@@ -635,6 +661,61 @@ test("sweeping without an email is 400 and for an unknown one is 404", async () 
     assert.equal(none.status, 400);
     const unknown = await fetch(`${inst.url}/api/devices/sweep?email=nobody@x.test`, { method: "POST" });
     assert.equal(unknown.status, 404);
+  } finally {
+    await inst.close();
+  }
+});
+
+test("a stranger who knows the email cannot register a device", async () => {
+  // The whole point of the enrolment code: an email is not proof of belonging.
+  const store = new EntitlementStore({ file: join(dir, "stranger.json") });
+  await store.put({
+    email: "victim@test",
+    plan: "family",
+    seats: 5,
+    status: "active",
+    valid_until: null,
+    enrolment_hash: hashSecret("FAMILYCODE"),
+  });
+  const inst = await startServer(0, {
+    store,
+    stripe: { fetch: fakeStripeFetch, secret: "sk" },
+    devices: new DeviceRegistry(),
+  });
+  try {
+    const noCode = await fetch(`${inst.url}/api/bundle?email=victim@test&device=junk`);
+    assert.equal(noCode.status, 403);
+    assert.deepEqual(await noCode.json(), { error: "enrolment_required" });
+
+    const wrongCode = await fetch(`${inst.url}/api/bundle?email=victim@test&device=junk&enrolment=WRONG`);
+    assert.equal(wrongCode.status, 403);
+
+    assert.equal(new DeviceRegistry().count("victim@test"), 0, "no seat may be consumed");
+    const after = await (await fetch(`${inst.url}/api/devices?email=victim@test`)).json();
+    assert.equal(after.used, 0, "the family's seats are untouched");
+  } finally {
+    await inst.close();
+  }
+});
+
+test("the enrolment code is case-insensitive but must be exact", async () => {
+  const store = new EntitlementStore({ file: join(dir, "case.json") });
+  await store.put({
+    email: "case@test",
+    plan: "family",
+    seats: 5,
+    status: "active",
+    valid_until: null,
+    enrolment_hash: hashSecret("FAMILYCODE"),
+  });
+  const inst = await startServer(0, {
+    store,
+    stripe: { fetch: fakeStripeFetch, secret: "sk" },
+    devices: new DeviceRegistry(),
+  });
+  try {
+    const lower = await fetch(`${inst.url}/api/bundle?email=case@test&device=TV&enrolment=familycode`);
+    assert.equal(lower.status, 200, "read down a phone line, case must not matter");
   } finally {
     await inst.close();
   }

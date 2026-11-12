@@ -190,6 +190,20 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
             json(res, 401, { error: "invalid_device_secret" });
             return;
           }
+
+          // A first-time device has no secret, so it must prove it belongs to the
+          // family. Without this, anyone who knows an email can fill every seat
+          // with junk and lock the family's own television out.
+          const code = (url.searchParams.get("enrolment") ?? "").trim().toUpperCase();
+          if (!record.enrolment_hash) {
+            json(res, 403, { error: "enrolment_required" });
+            return;
+          }
+          if (!code || !secretMatches(code, record.enrolment_hash)) {
+            json(res, 403, { error: "enrolment_required" });
+            return;
+          }
+
           if (devices.count(record.email) >= record.seats) {
             json(res, 403, { error: "seat_limit_reached" });
             return;

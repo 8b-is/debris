@@ -217,6 +217,21 @@ export const DEFAULT_DEVICES_FILE = join(
   "devices.json",
 );
 
+/**
+ * A fresh enrolment code.
+ *
+ * Human-typeable but not guessable: 10 characters of base32 gives 50 bits, which
+ * is short enough to read down a phone line and long enough that a stranger cannot
+ * find a valid one by trying.
+ */
+export function newEnrolmentCode(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I, O, 0, 1
+  const bytes = randomBytes(10);
+  let out = "";
+  for (const b of bytes) out += alphabet[b % alphabet.length]!;
+  return out;
+}
+
 /** Load the registry from disk, or start empty. */
 export function loadDevices(file: string = DEFAULT_DEVICES_FILE): DeviceRegistry {
   // The file is required, never defaulted to the entitlement ledger's path: a

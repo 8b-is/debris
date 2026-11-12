@@ -50,6 +50,15 @@ export interface Entitlement {
   status: EntitlementStatus;
   /** ISO 8601, or null for the free tier. */
   valid_until: string | null;
+  /**
+   * sha256 of the family enrolment code, or null before one is issued.
+   *
+   * A device registering for the first time has no secret to prove it belongs to
+   * this family, so without this anyone who knows the email can fill every seat
+   * with junk and lock the family's real television out. The code is issued out of
+   * band at signup and stored hashed, exactly like a device secret.
+   */
+  enrolment_hash?: string | null;
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -216,6 +225,10 @@ export class EntitlementStore {
       seats: record.seats,
       status: record.status,
       valid_until: record.valid_until ?? null,
+      // Carried explicitly rather than spread, so adding a field to Entitlement
+      // cannot silently start dropping it on write. A dropped enrolment hash
+      // locks every device out of a paid account.
+      enrolment_hash: record.enrolment_hash ?? null,
     };
 
     const run = async (): Promise<void> => {

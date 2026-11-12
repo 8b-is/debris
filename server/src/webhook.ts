@@ -13,6 +13,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { audit } from "./audit.ts";
+import { hashSecret, newEnrolmentCode } from "./devices.ts";
 import { MS_PER_SECOND, WEBHOOK_TOLERANCE_SECONDS } from "./consts.ts";
 import { getPlan } from "./plans.ts";
 import {
@@ -147,13 +148,19 @@ export async function dispatchEvent(
         await store.put(freeEntitlement(email));
         return { ok: true, received: true, event: type };
       }
+      // The first grant carries the family enrolment code. It is shown once, here,
+      // and stored hashed: a device registering for the first time needs it to
+      // prove it belongs to this family.
+      const code = newEnrolmentCode();
       await store.put({
         email,
         plan: plan.id,
         seats: plan.seats,
         status: "active",
         valid_until: oneMonthAfter(created),
+        enrolment_hash: hashSecret(code),
       });
+      console.log(`enrolment code for ${email}: ${code}`);
       audit({ event: "entitlement.granted", email, plan: plan.id, stripe_event: event.id });
       return { ok: true, received: true, event: type };
     }
