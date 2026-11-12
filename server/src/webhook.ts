@@ -130,10 +130,23 @@ function emailOf(obj: StripeObject): string {
  * Returns ignored:true for event types we do not act on, so Stripe is
  * acknowledged rather than retried forever.
  */
+export interface DispatchDeps {
+  /**
+   * Called when a subscription ends, so the caller can release that family's
+   * devices.
+   *
+   * Without this the registry keeps every device of a cancelled subscription: the
+   * family resubscribes, gets a new enrolment code, and finds their seats already
+   * occupied by devices nobody can identify.
+   */
+  onSubscriptionEnded?: (email: string) => string[];
+}
+
 export async function dispatchEvent(
   store: EntitlementStore,
   event: StripeEvent,
   nowSeconds: number = Math.floor(Date.now() / MS_PER_SECOND),
+  deps: DispatchDeps = {},
 ): Promise<WebhookResult> {
   const type = typeof event.type === "string" ? event.type : "";
   const created = typeof event.created === "number" ? event.created : nowSeconds;
@@ -145,7 +158,7 @@ export async function dispatchEvent(
       const email = emailOf(obj);
       if (!email) return { ok: true, received: true, ignored: true, event: type };
       if (!plan || plan.id === "free") {
-        await store.put(freeEntitlement(email));
+        await store.put(freeEntitlement(email, store.get(email)));
         return { ok: true, received: true, event: type };
       }
       // The first grant carries the family enrolment code. It is shown once, here,
@@ -178,7 +191,7 @@ export async function dispatchEvent(
       const plan = requested ?? (existing && existing.plan !== "free" ? getPlan(existing.plan) : null);
 
       if (!plan || plan.id === "free") {
-        await store.put(freeEntitlement(email));
+        await store.put(freeEntitlement(email, store.get(email)));
         return { ok: true, received: true, event: type };
       }
       await store.put({
@@ -197,7 +210,11 @@ export async function dispatchEvent(
     case "customer.subscription.deleted": {
       const email = emailOf(obj);
       if (!email) return { ok: true, received: true, ignored: true, event: type };
-      await store.put(freeEntitlement(email));
+      await store.put(freeEntitlement(email, store.get(email)));
+      const released = deps.onSubscriptionEnded?.(email) ?? [];
+      for (const id of released) {
+        audit({ event: "device.released", email, device: id });
+      }
       audit({ event: "entitlement.revoked", email, plan: "free", stripe_event: event.id });
       return { ok: true, received: true, event: type };
     }
@@ -229,6 +246,7 @@ export async function handleWebhook(
   header: string | null,
   secret: string | undefined,
   nowSeconds: number = Math.floor(Date.now() / MS_PER_SECOND),
+  deps: DispatchDeps = {},
 ): Promise<WebhookResult> {
   if (!verifySignature(rawBody, header, secret, nowSeconds)) {
     return { ok: false, error: "bad_signature" };
@@ -241,5 +259,5 @@ export async function handleWebhook(
     return { ok: false, error: "bad_payload" };
   }
 
-  return dispatchEvent(store, event, nowSeconds);
+  return dispatchEvent(store, event, nowSeconds, deps);
 }

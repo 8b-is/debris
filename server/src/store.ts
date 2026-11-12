@@ -310,13 +310,21 @@ export function oneMonthAfter(seconds: number): string {
   return new Date(Date.UTC(targetYear, month, day, d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds())).toISOString();
 }
 
-/** The free-tier record, used by downgrade paths. */
-export function freeEntitlement(email: string): Entitlement {
+/**
+ * The free-tier record, used by downgrade paths.
+ *
+ * The enrolment hash is preserved when one already exists. Clearing it would
+ * invalidate the family's code on a lapsed subscription, and a family that pays
+ * again would need a new code printed while their old devices still sat in the
+ * registry holding seats. `downgrade` handles releasing those seats separately.
+ */
+export function freeEntitlement(email: string, existing?: Entitlement | null): Entitlement {
   return {
     email: normalizeEmail(email),
     plan: "free",
     seats: PLANS.free.seats,
     status: "free",
     valid_until: null,
+    enrolment_hash: existing?.enrolment_hash ?? null,
   };
 }

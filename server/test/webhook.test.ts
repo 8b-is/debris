@@ -239,3 +239,45 @@ test("an explicit cancel still ends the period", async () => {
   });
   assert.equal(store.get("cancel@pay.test")?.valid_until, null);
 });
+
+test("cancelling releases the family's devices and keeps their enrolment code", async () => {
+  const { DeviceRegistry, hashSecret } = await import("../src/devices.ts");
+  const reg = new DeviceRegistry();
+  const code = hashSecret("FAMILYCODE");
+  await dispatchEvent(store, {
+    type: "checkout.session.completed",
+    created: Math.floor(Date.now() / 1000),
+    data: { object: { metadata: { plan: "household", email: "end@sub.test" } } },
+  });
+  // The grant prints a code; put a known one in place to test the carry-through.
+  await store.put({ ...store.get("end@sub.test")!, enrolment_hash: code });
+  reg.issue("end@sub.test", "TV");
+
+  const released = await dispatchEvent(store, {
+    type: "customer.subscription.deleted",
+    created: Math.floor(Date.now() / 1000),
+    data: { object: { customer_email: "end@sub.test" } },
+  }, Math.floor(Date.now() / 1000), { onSubscriptionEnded: (email) => reg.releaseAllForEmail(email) });
+
+  assert.equal(released.ok, true);
+  assert.equal(store.get("end@sub.test")?.plan, "free");
+  assert.equal(store.get("end@sub.test")?.enrolment_hash, code, "the code must survive a lapsed subscription");
+  assert.equal(reg.count("end@sub.test"), 0, "the seats must be released");
+});
+
+test("a downgrade to free does not clear an existing enrolment code", async () => {
+  const { hashSecret } = await import("../src/devices.ts");
+  const code = hashSecret("KEEPME");
+  await dispatchEvent(store, {
+    type: "checkout.session.completed",
+    created: Math.floor(Date.now() / 1000),
+    data: { object: { metadata: { plan: "family", email: "keep@code.test" } } },
+  });
+  await store.put({ ...store.get("keep@code.test")!, enrolment_hash: code });
+  await dispatchEvent(store, {
+    type: "customer.subscription.deleted",
+    created: Math.floor(Date.now() / 1000),
+    data: { object: { customer_email: "keep@code.test" } },
+  });
+  assert.equal(store.get("keep@code.test")?.enrolment_hash, code);
+});

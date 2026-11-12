@@ -235,7 +235,7 @@ The ADRs are accepted. The landing and the server are built to
 What is built: the entitlement ledger, the tier table, the addon manifest, the
 configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
 HMAC-verified webhooks that fail closed, an audit line for every entitlement change,
-and a restart that drains in-flight grants instead of dropping them. 124 tests,
+and a restart that drains in-flight grants instead of dropping them. 127 tests,
 offline.
 
 **A new device must prove it belongs to the family.** Knowing an email is not proof:
@@ -259,6 +259,12 @@ audit line now names the device.
 unseen for 90 days, so a phone sold in spring does not hold a seat at Christmas. It
 runs on request, never on a read: a family away for a month comes home to its
 devices still registered.
+
+**Cancelling releases the seats.** A cancelled subscription used to leave its devices
+registered, so a family that paid again got a new enrolment code and found their seats
+already occupied by devices nobody could identify. Ending a subscription now releases
+that family's devices — and only that family's — while keeping the code, so resubscribing
+with the same code works and the seats are free.
 
 **`/api/bundle` is rate limited.** Each request hashes, and a first-time device also
 writes to disk and fsyncs, so an uncapped caller chooses how much work the service

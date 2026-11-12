@@ -178,3 +178,15 @@ test("a sweep with nothing stale changes nothing", () => {
   assert.deepEqual(reg.sweepStale(90), []);
   assert.equal(reg.count("dra@test"), 1);
 });
+
+test("releasing every device on a subscription returns their ids", () => {
+  const reg = new DeviceRegistry();
+  reg.issue("dra@test", "TV");
+  reg.issue("dra@test", "Phone");
+  reg.issue("other@test", "Theirs");
+
+  const removed = reg.releaseAllForEmail("dra@test");
+  assert.equal(removed.length, 2);
+  assert.equal(reg.count("dra@test"), 0);
+  assert.equal(reg.count("other@test"), 1, "another family's devices must not be touched");
+});

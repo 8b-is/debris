@@ -317,6 +317,16 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
           body.text,
           req.headers["stripe-signature"] as string | undefined ?? null,
           process.env.STRIPE_WEBHOOK_SECRET,
+          Math.floor(Date.now() / 1000),
+          {
+            onSubscriptionEnded: (email) => {
+              const released = devices.releaseAllForEmail(email);
+              for (const id of released) {
+                console.log(`device released: ${id} (${email})`);
+              }
+              return released;
+            },
+          },
         );
         if (!result.ok) {
           json(res, 400, { error: result.error });

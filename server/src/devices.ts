@@ -194,6 +194,21 @@ export class DeviceRegistry {
     return removed;
   }
 
+  /**
+   * Release every device on one subscription, returning the ids removed.
+   *
+   * A cancelled subscription used to leave its devices registered, so a family
+   * that paid again found its seats already taken by devices nobody could
+   * identify. The webhook calls this when a subscription ends.
+   */
+  releaseAllForEmail(email: string): string[] {
+    const key = email.trim().toLowerCase();
+    const removed = this.forEmail(key).map((d) => d.id);
+    for (const id of removed) delete this.#devices[id];
+    if (removed.length > 0) this.#changed();
+    return removed;
+  }
+
   /** Revoke one device by id. Returns false when it does not exist. */
   revoke(id: string): boolean {
     if (!this.#devices[id]) return false;
