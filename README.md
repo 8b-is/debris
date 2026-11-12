@@ -221,6 +221,11 @@ configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
 HMAC-verified webhooks that fail closed, and an audit line for every
 entitlement change. 87 tests, offline.
 
+**Seats are advertised but not enforced.** `seats` is stored and served, and nothing
+counts devices against it, because no device has an identity. A household customer
+could attach forty devices and the API would answer every one. Device tokens fix this
+along with the authentication gap below.
+
 **The entitlement and bundle routes have no authentication.** Anyone who knows a
 family member's email can read their plan and request a bundle in their name. The
 ledger holds no credential and a bundle carries none, but this is still an

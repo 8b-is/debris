@@ -56,6 +56,18 @@ email confirms a guess.
 **Bad.** The code does not contain the fix, so the gap will not close by itself. The
 next person to deploy has to notice this file.
 
+## The second thing device tokens have to fix: seats
+
+`seats` is stored, served, and advertised on the pricing page. Nothing counts devices
+against it, and nothing can: there is no device identity anywhere in the service. A
+household customer could attach forty devices and the API would answer every one.
+
+This is not a separate bug from the missing authentication — it is the same missing
+piece. Device tokens are the thing that would make seats enforceable: issue one per
+device, count the live ones, refuse the one past the limit. Until they exist, the seat
+number on the pricing page is a promise the code cannot keep, and it is documented as
+such rather than left to be discovered.
+
 ## Expiry
 
 This ADR expires the moment the service is deployed to anything other than localhost.
