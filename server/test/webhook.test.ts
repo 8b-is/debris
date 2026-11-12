@@ -281,3 +281,80 @@ test("a downgrade to free does not clear an existing enrolment code", async () =
   });
   assert.equal(store.get("keep@code.test")?.enrolment_hash, code);
 });
+
+test("a renewal extends the paid period instead of leaving the customer expired", async () => {
+  // The expiry used to be written once and never extended, so every customer was
+  // locked out after one month regardless of whether they kept paying.
+  const fortyDaysAgo = Math.floor(Date.now() / 1000) - 40 * 86_400;
+  await dispatchEvent(store, {
+    type: "checkout.session.completed",
+    created: fortyDaysAgo,
+    data: { object: { metadata: { plan: "family", email: "renew@pay.test" } } },
+  }, fortyDaysAgo);
+  assert.equal(store.get("renew@pay.test")?.status, "active");
+  const stale = store.get("renew@pay.test")!;
+  assert.equal(Date.parse(stale.valid_until!) < Date.now(), true, "the first period has passed");
+
+  const now = Math.floor(Date.now() / 1000);
+  await dispatchEvent(store, {
+    type: "invoice.paid",
+    created: now,
+    data: { object: { customer_email: "renew@pay.test", metadata: { plan: "family" } } },
+  }, now);
+
+  const renewed = store.get("renew@pay.test")!;
+  assert.equal(renewed.plan, "family", "a renewal must not change the tier");
+  assert.equal(Date.parse(renewed.valid_until!) > Date.now(), true, "the period must be extended");
+  assert.equal(renewed.valid_until!.slice(0, 7), new Date((now + 30 * 86_400) * 1000).toISOString().slice(0, 7));
+});
+
+test("invoice.payment_succeeded renews the same as invoice.paid", async () => {
+  const now = Math.floor(Date.now() / 1000);
+  await dispatchEvent(store, {
+    type: "checkout.session.completed",
+    created: now - 40 * 86_400,
+    data: { object: { metadata: { plan: "household", email: "succeed@pay.test" } } },
+  }, now - 40 * 86_400);
+  const before = store.get("succeed@pay.test")!.valid_until;
+
+  await dispatchEvent(store, {
+    type: "invoice.payment_succeeded",
+    created: now,
+    data: { object: { customer_email: "succeed@pay.test", metadata: { plan: "household" } } },
+  }, now);
+  const after = store.get("succeed@pay.test")!.valid_until;
+  assert.notEqual(after, before, "a successful payment must extend the period");
+  assert.equal(Date.parse(after!) > Date.now(), true);
+});
+
+test("a metadata-less update still keeps the tier and does not downgrade", async () => {
+  const now = Math.floor(Date.now() / 1000);
+  await dispatchEvent(store, {
+    type: "checkout.session.completed",
+    created: now,
+    data: { object: { metadata: { plan: "household", email: "steady@pay.test" } } },
+  }, now);
+  await dispatchEvent(store, {
+    type: "customer.subscription.updated",
+    created: now + 60,
+    data: { object: { customer_email: "steady@pay.test", metadata: {}, status: "active" } },
+  }, now + 60);
+  assert.equal(store.get("steady@pay.test")?.plan, "household");
+});
+
+test("a cancel still ends the period, even through the renewal path", async () => {
+  const now = Math.floor(Date.now() / 1000);
+  await dispatchEvent(store, {
+    type: "checkout.session.completed",
+    created: now,
+    data: { object: { metadata: { plan: "family", email: "cancel2@pay.test" } } },
+  }, now);
+  await dispatchEvent(store, {
+    type: "customer.subscription.updated",
+    created: now + 60,
+    data: {
+      object: { customer_email: "cancel2@pay.test", metadata: { plan: "family" }, status: "canceled" },
+    },
+  }, now + 60);
+  assert.equal(store.get("cancel2@pay.test")?.valid_until, null);
+});

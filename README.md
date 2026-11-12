@@ -235,7 +235,7 @@ The ADRs are accepted. The landing and the server are built to
 What is built: the entitlement ledger, the tier table, the addon manifest, the
 configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
 HMAC-verified webhooks that fail closed, an audit line for every entitlement change,
-and a restart that drains in-flight grants instead of dropping them. 127 tests,
+and a restart that drains in-flight grants instead of dropping them. 131 tests,
 offline.
 
 **A new device must prove it belongs to the family.** Knowing an email is not proof:
@@ -259,6 +259,11 @@ audit line now names the device.
 unseen for 90 days, so a phone sold in spring does not hold a seat at Christmas. It
 runs on request, never on a read: a family away for a month comes home to its
 devices still registered.
+
+**Renewals extend the period.** The expiry was written once at grant and never extended,
+so a customer who kept paying was locked out after one month. `invoice.paid` and
+`invoice.payment_succeeded` are now handled and extend from the invoice date, which
+keeps the period exactly one month long and self-corrects after downtime.
 
 **Cancelling releases the seats.** A cancelled subscription used to leave its devices
 registered, so a family that paid again got a new enrolment code and found their seats

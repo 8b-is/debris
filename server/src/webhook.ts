@@ -178,7 +178,9 @@ export async function dispatchEvent(
       return { ok: true, received: true, event: type };
     }
 
-    case "customer.subscription.updated": {
+    case "customer.subscription.updated":
+    case "invoice.paid":
+    case "invoice.payment_succeeded": {
       const email = emailOf(obj);
       if (!email) return { ok: true, received: true, ignored: true, event: type };
 
@@ -194,16 +196,41 @@ export async function dispatchEvent(
         await store.put(freeEntitlement(email, store.get(email)));
         return { ok: true, received: true, event: type };
       }
+
+      // A renewal is a new paid period. `invoice.paid` and
+      // `invoice.payment_succeeded` are how Stripe says "the money arrived", and
+      // ignoring them left every customer expired after one month: the expiry was
+      // written once and never extended. Extending from `created` (the invoice
+      // date) rather than from the old expiry keeps the period exactly one month
+      // long and self-corrects after downtime.
+      const isRenewal =
+        type === "invoice.paid" ||
+        type === "invoice.payment_succeeded" ||
+        // A subscription update that carries a new current_period is also a
+        // renewal, but without one we must not silently extend a period.
+        (type === "customer.subscription.updated" && obj.status !== "canceled");
+
+      const nextExpiry =
+        obj.status === "canceled"
+          ? null
+          : isRenewal
+            ? oneMonthAfter(created)
+            : (existing?.valid_until ?? oneMonthAfter(created));
+
       await store.put({
         email,
         plan: plan.id,
         // Keep the seats the customer already has unless the tier itself changed.
         seats: requested ? plan.seats : (existing?.seats ?? plan.seats),
         status: obj.status === "past_due" ? "past_due" : "active",
-        // An explicit cancel is the only thing that ends the period.
-        valid_until: obj.status === "canceled" ? null : (existing?.valid_until ?? oneMonthAfter(created)),
+        valid_until: nextExpiry,
       });
-      audit({ event: "entitlement.updated", email, plan: plan.id, stripe_event: event.id });
+      audit({
+        event: type.startsWith("invoice.") ? "entitlement.renewed" : "entitlement.updated",
+        email,
+        plan: plan.id,
+        stripe_event: event.id,
+      });
       return { ok: true, received: true, event: type };
     }
 
