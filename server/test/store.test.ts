@@ -118,3 +118,22 @@ test("free entitlements carry the free seat count and no expiry", () => {
   assert.equal(record.status, "free");
   assert.equal(record.valid_until, null);
 });
+test("a failed flush rolls the ledger back instead of claiming a persisted write", async () => {
+  // Point the ledger at a directory: rename onto a directory fails, so the flush
+  // fails. Memory must not claim a write that never reached disk.
+  const broken = new EntitlementStore({ file: dir });
+  await assert.rejects(() =>
+    broken.put({
+      email: "rollback@test",
+      plan: "family",
+      seats: 5,
+      status: "active",
+      valid_until: null,
+    }),
+  );
+  assert.equal(
+    broken.get("rollback@test"),
+    null,
+    "a failed write must not be visible to readers",
+  );
+});

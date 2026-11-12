@@ -79,7 +79,13 @@ export class EntitlementStore {
     return Object.values(this.#ledger);
   }
 
-  /** Insert or replace one entitlement. Resolves once the file has landed. */
+  /**
+   * Insert or replace one entitlement. Resolves once the file has landed.
+   *
+   * The ledger is updated only after a successful flush. Updating memory first
+   * would leave the store claiming a write that never reached disk, and a later
+   * read would report it as persisted.
+   */
   put(record: Entitlement): Promise<void> {
     const key = normalizeEmail(record.email);
     if (!key) return Promise.reject(new Error("email_required"));
@@ -93,8 +99,16 @@ export class EntitlementStore {
     };
 
     const run = async (): Promise<void> => {
+      const previous = this.#ledger[key];
       this.#ledger[key] = next;
-      await this.#flush();
+      try {
+        await this.#flush();
+      } catch (err) {
+        // Roll memory back so a failed write is not reported as persisted.
+        if (previous === undefined) delete this.#ledger[key];
+        else this.#ledger[key] = previous;
+        throw err;
+      }
     };
 
     // Chain onto the queue, but keep the queue itself from ever rejecting:

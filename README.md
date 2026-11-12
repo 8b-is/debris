@@ -216,7 +216,7 @@ The ADRs are accepted. The landing and the server are built to
 
 What is built: the entitlement ledger, the tier table, the addon manifest, the
 configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
-HMAC-verified webhooks that fail closed. 64 tests, offline.
+HMAC-verified webhooks that fail closed. 68 tests, offline.
 
 What is not built: **the credential broker** — nothing in this service stores a
 debrid token yet. The bundle is the shape it will hand out, and the bundle

@@ -159,7 +159,15 @@ export async function dispatchEvent(
     case "customer.subscription.updated": {
       const email = emailOf(obj);
       if (!email) return { ok: true, received: true, ignored: true, event: type };
-      const plan = getPlan(obj.metadata?.plan);
+
+      // An update that carries no plan metadata is not a downgrade. Stripe sends
+      // these for prorations, quantity changes, and edits made in the dashboard,
+      // none of which say anything about which tier the customer is on. Falling
+      // back to `free` here silently cut a paying household off.
+      const existing = store.get(email);
+      const requested = getPlan(obj.metadata?.plan);
+      const plan = requested ?? (existing && existing.plan !== "free" ? getPlan(existing.plan) : null);
+
       if (!plan || plan.id === "free") {
         await store.put(freeEntitlement(email));
         return { ok: true, received: true, event: type };
@@ -167,9 +175,11 @@ export async function dispatchEvent(
       await store.put({
         email,
         plan: plan.id,
-        seats: plan.seats,
+        // Keep the seats the customer already has unless the tier itself changed.
+        seats: requested ? plan.seats : (existing?.seats ?? plan.seats),
         status: obj.status === "past_due" ? "past_due" : "active",
-        valid_until: obj.status === "canceled" ? null : oneMonthAfter(created),
+        // An explicit cancel is the only thing that ends the period.
+        valid_until: obj.status === "canceled" ? null : (existing?.valid_until ?? oneMonthAfter(created)),
       });
       return { ok: true, received: true, event: type };
     }

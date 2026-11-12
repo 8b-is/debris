@@ -175,3 +175,67 @@ test("a signed but unparseable body reports bad_payload", async () => {
   const result = await handleWebhook(store, body, header, SECRET);
   assert.deepEqual(result, { ok: false, error: "bad_payload" });
 });
+test("an update without plan metadata keeps the current tier", async () => {
+  // Stripe sends metadata-less updates for prorations and dashboard edits. Those
+  // say nothing about the tier, so they must not be read as a downgrade.
+  await dispatchEvent(store, {
+    type: "checkout.session.completed",
+    created: 1_760_000_000,
+    data: { object: { metadata: { plan: "household", email: "steady@pay.test" } } },
+  });
+  assert.equal(store.get("steady@pay.test")?.plan, "household");
+
+  await dispatchEvent(store, {
+    type: "customer.subscription.updated",
+    created: 1_760_100_000,
+    data: {
+      object: { customer_email: "steady@pay.test", metadata: {}, status: "active" },
+    },
+  });
+
+  const after = store.get("steady@pay.test");
+  assert.equal(after?.plan, "household", "a metadata-less update must not downgrade");
+  assert.equal(after?.seats, 12, "seats must survive an update that does not change tier");
+});
+
+test("an update that names a different tier does change it", async () => {
+  await dispatchEvent(store, {
+    type: "checkout.session.completed",
+    created: 1_760_000_000,
+    data: { object: { metadata: { plan: "family", email: "upgrade@pay.test" } } },
+  });
+  await dispatchEvent(store, {
+    type: "customer.subscription.updated",
+    created: 1_760_100_000,
+    data: {
+      object: {
+        customer_email: "upgrade@pay.test",
+        metadata: { plan: "household" },
+        status: "active",
+      },
+    },
+  });
+  const after = store.get("upgrade@pay.test");
+  assert.equal(after?.plan, "household");
+  assert.equal(after?.seats, 12);
+});
+
+test("an explicit cancel still ends the period", async () => {
+  await dispatchEvent(store, {
+    type: "checkout.session.completed",
+    created: 1_760_000_000,
+    data: { object: { metadata: { plan: "family", email: "cancel@pay.test" } } },
+  });
+  await dispatchEvent(store, {
+    type: "customer.subscription.updated",
+    created: 1_760_100_000,
+    data: {
+      object: {
+        customer_email: "cancel@pay.test",
+        metadata: { plan: "family" },
+        status: "canceled",
+      },
+    },
+  });
+  assert.equal(store.get("cancel@pay.test")?.valid_until, null);
+});
