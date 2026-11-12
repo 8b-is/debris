@@ -830,3 +830,25 @@ test("a device secret for one email cannot read another email's status", async (
     await inst.close();
   }
 });
+
+test("the bundle route refuses a caller who floods it", async () => {
+  const { RateLimiter } = await import("../src/ratelimit.ts");
+  const inst = await startServer(0, {
+    store: new EntitlementStore({ file: join(dir, "flood.json") }),
+    stripe: { fetch: fakeStripeFetch, secret: "sk" },
+    devices: new DeviceRegistry(),
+    // A tiny allowance so the test does not need hundreds of requests.
+    limiter: new RateLimiter({ capacity: 3, windowMs: 60_000 }),
+  });
+  try {
+    const codes = [];
+    for (let i = 0; i < 8; i += 1) {
+      const res = await fetch(`${inst.url}/api/bundle?email=nobody@flood.test&device=junk${i}`);
+      codes.push(res.status);
+    }
+    assert.equal(codes.filter((c) => c === 429).length > 0, true, "a flood must be refused");
+    assert.equal(codes.filter((c) => c === 429).length, 5, "3 allowed, 5 refused");
+  } finally {
+    await inst.close();
+  }
+});

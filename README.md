@@ -171,6 +171,7 @@ these and on nothing else:
 | 404 | `unknown_device` | no device with that id, or the secret does not match |
 | 404 | `unknown_entitlement` | no ledger entry for that email |
 | 409 | `already_subscribed` | checkout asked for an email whose subscription is active |
+| 429 | `rate_limited` | too many bundle requests from this caller; try again shortly |
 | 500 | `internal` | anything unhandled |
 | 502 | `upstream_failed` | Stripe returned a non-2xx |
 
@@ -234,7 +235,7 @@ The ADRs are accepted. The landing and the server are built to
 What is built: the entitlement ledger, the tier table, the addon manifest, the
 configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
 HMAC-verified webhooks that fail closed, an audit line for every entitlement change,
-and a restart that drains in-flight grants instead of dropping them. 118 tests,
+and a restart that drains in-flight grants instead of dropping them. 124 tests,
 offline.
 
 **A new device must prove it belongs to the family.** Knowing an email is not proof:
@@ -258,6 +259,12 @@ audit line now names the device.
 unseen for 90 days, so a phone sold in spring does not hold a seat at Christmas. It
 runs on request, never on a read: a family away for a month comes home to its
 devices still registered.
+
+**`/api/bundle` is rate limited.** Each request hashes, and a first-time device also
+writes to disk and fsyncs, so an uncapped caller chooses how much work the service
+does. A token bucket allows a burst of 20 and a sustained 5 per second per address,
+refilling proportionally; a caller over the line gets 429. It is not a defence against
+guessing an enrolment code, which is 50 bits and not the threat.
 
 **Two taps in the same second make one session.** The active-subscription check and
 the Stripe call are not atomic, so a per-email in-flight guard turns the second into a

@@ -10,7 +10,7 @@ type stripping — there is no build step, no bundler, and no `node_modules`.
 ```bash
 cd ~/workspace/peterlodri-sec/8b-is-debris
 scripts/verify.sh            # syntax check every source, then the whole suite
-node --test server/test/     # 118 tests, offline, no network
+node --test server/test/     # 124 tests, offline, no network
 node server/src/server.ts    # serves on PORT, default 8787
 ```
 
@@ -51,6 +51,10 @@ node server/src/server.ts    # serves on PORT, default 8787
   cannot make a third-party player honour a filter. The docs say "asks for" and
   "prefers"; do not upgrade that to "forces" without a component in this repo that
   actually filters, and do not imply the service can police a device it does not run on.
+- **`/api/bundle` is the only route with a limit, because it is the only one a stranger
+  can make expensive.** A sha256 per request and an fsync per new device is work an
+  anonymous caller should not be able to schedule. The bucket is keyed by remote
+  address, so a proxy must forward it or every request shares one bucket.
 - **A new device needs the family enrolment code.** An email is not proof of belonging:
   without this anyone who knows one could fill every seat with junk and lock the
   family's own television out. The code is printed once on the first subscription
@@ -90,7 +94,8 @@ server/src/webhook.ts     HMAC-SHA256 verification and event dispatch
 server/src/server.ts      the five routes
 server/src/audit.ts       one-line audit trail for every entitlement change
 server/src/devices.ts     the device registry: hashed secrets, seats, persistence
-server/test/              118 offline tests, including landing, README, audit, and device parity
+server/src/ratelimit.ts   per-caller token bucket for the expensive route
+server/test/              124 offline tests, including landing, README, audit, and device parity
 landing/                  static page: index.html, landing.css, tokens.css, app.js
 docs/adr/                 the five decisions, each with what would change it
 docs/ELI5.md              what it is, for a ten-year-old

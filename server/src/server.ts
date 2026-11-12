@@ -12,12 +12,15 @@ import { audit } from "./audit.ts";
 import {
   BODY_TIMEOUT_MS,
   DEFAULT_PORT,
+  BUNDLE_RATE_BURST,
+  BUNDLE_RATE_PER_SECOND,
   DEVICE_STALE_DAYS,
   MAX_BODY_BYTES,
   SHUTDOWN_GRACE_MS,
   VERSION,
 } from "./consts.ts";
 import { DeviceRegistry, loadDevices, secretMatches } from "./devices.ts";
+import { RateLimiter } from "./ratelimit.ts";
 import { createBundle } from "./manifest.ts";
 import { PLAN_LIST } from "./plans.ts";
 import { EntitlementStore, isActiveNow, normalizeEmail } from "./store.ts";
@@ -28,6 +31,7 @@ export interface ServerDeps {
   store?: EntitlementStore;
   stripe?: StripeDeps;
   devices?: DeviceRegistry;
+  limiter?: RateLimiter;
 }
 
 /**
@@ -45,6 +49,15 @@ export interface DebrisServer {
   store: EntitlementStore;
   devices: DeviceRegistry;
   close: () => Promise<void>;
+}
+
+/** The caller's identity for rate limiting: the forwarded address, or the socket. */
+function callerKey(req: IncomingMessage): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.length > 0) {
+    return forwarded.split(",")[0]!.trim();
+  }
+  return req.socket.remoteAddress ?? "unknown";
 }
 
 /** Extract a Bearer token from an Authorization header, or null. */
@@ -130,6 +143,9 @@ function readJsonBody(
 export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
   const store = deps.store ?? new EntitlementStore();
   const devices = deps.devices ?? loadDevices();
+  const limiter =
+    deps.limiter ??
+    new RateLimiter({ capacity: BUNDLE_RATE_BURST, windowMs: 1000 / BUNDLE_RATE_PER_SECOND });
   const stripe: StripeDeps = deps.stripe ?? {
     fetch: fetch as unknown as StripeDeps["fetch"],
     secret: process.env.STRIPE_SECRET_KEY,
@@ -159,6 +175,13 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
       // The broker. A device asks for its configuration bundle; the credential is
       // never a field in the response, so it cannot be serialised by accident.
       if (method === "GET" && url.pathname === "/api/bundle") {
+        // Every request here hashes, and a first-time device also writes to disk.
+        // Without a limit a caller chooses how much work the service does.
+        const caller = callerKey(req);
+        if (!limiter.allow(caller)) {
+          json(res, 429, { error: "rate_limited" });
+          return;
+        }
         const email = normalizeEmail(url.searchParams.get("email"));
         const record = email ? store.get(email) : null;
         if (!record) {

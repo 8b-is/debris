@@ -34,6 +34,12 @@ export const UPSTREAM_TIMEOUT_MS = 10_000;
 /** How long a restart may take to drain before it gives up and exits. */
 export const SHUTDOWN_GRACE_MS = 15_000;
 
+/** How many bundle requests one caller may make per second, sustained. */
+export const BUNDLE_RATE_PER_SECOND = 5;
+
+/** How many bundle requests one caller may burst before being refused. */
+export const BUNDLE_RATE_BURST = 20;
+
 /**
  * A device not seen for this many days is stale enough to sweep.
  *
