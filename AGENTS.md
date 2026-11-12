@@ -10,7 +10,7 @@ type stripping — there is no build step, no bundler, and no `node_modules`.
 ```bash
 cd ~/workspace/peterlodri-sec/8b-is-debris
 scripts/verify.sh            # syntax check every source, then the whole suite
-node --test server/test/     # 131 tests, offline, no network
+node --test server/test/     # 132 tests, offline, no network
 node server/src/server.ts    # serves on PORT, default 8787
 ```
 
@@ -62,6 +62,9 @@ node server/src/server.ts    # serves on PORT, default 8787
 - **A field added to `Entitlement` must be carried in `store.put`.** It builds the
   record explicitly rather than spreading, so a new field is silently dropped until
   someone adds it. That exact bug locked every device out of a paid account.
+- **A webhook grant must be idempotent.** Stripe delivers at least once, and re-running a
+  grant mints a new enrolment code, invalidating the one already printed to the family.
+  `EventLog.claim` records processed ids; any new event type must go through it.
 - **A renewal extends the period; an update does not.** `invoice.paid` and
   `invoice.payment_succeeded` mean money arrived and must extend `valid_until` from the
   invoice date. `customer.subscription.updated` covers prorations and dashboard edits and
@@ -104,7 +107,7 @@ server/src/server.ts      the five routes
 server/src/audit.ts       one-line audit trail for every entitlement change
 server/src/devices.ts     the device registry: hashed secrets, seats, persistence
 server/src/ratelimit.ts   per-caller token bucket for the expensive route
-server/test/              131 offline tests, including landing, README, audit, and device parity
+server/test/              132 offline tests, including landing, README, audit, and device parity
 landing/                  static page: index.html, landing.css, tokens.css, app.js
 docs/adr/                 the five decisions, each with what would change it
 docs/ELI5.md              what it is, for a ten-year-old

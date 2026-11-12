@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 
 import { DeviceRegistry, hashSecret } from "../src/devices.ts";
-import { EntitlementStore } from "../src/store.ts";
+import { EntitlementStore, EventLog } from "../src/store.ts";
 import { startServer, type DebrisServer } from "../src/server.ts";
 
 const SECRET = "whsec_route_test_secret";
@@ -32,6 +32,7 @@ beforeEach(async () => {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
 });
 
@@ -217,6 +218,7 @@ test("a correctly signed checkout grant persists and is readable", async () => {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     // A recent `created`: the grant sets valid_until one month out, so a 2025
@@ -310,6 +312,7 @@ test("bundle for an unpaid record is 402 payment_required", async () => {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const res = await fetch(`${unpaid.url}/api/bundle?email=unpaid@test`);
@@ -334,6 +337,7 @@ test("a paid record gets a bundle with addons and no credential", async () => {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     // First request registers the device and receives its secret once.
@@ -423,6 +427,7 @@ test("an already-active customer cannot start a second checkout", async () => {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const res = await fetch(`${double.url}/api/checkout`, {
@@ -450,6 +455,7 @@ test("a past_due customer can still check out again", async () => {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const res = await fetch(`${retry.url}/api/checkout`, {
@@ -476,6 +482,7 @@ test("an expired customer cannot pull a bundle, and can still pay again", async 
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const bundle = await fetch(`${inst.url}/api/bundle?email=lapsed@buy.test`);
@@ -502,6 +509,7 @@ test("a device secret from one email does not work for another", async () => {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const first = await fetch(`${inst.url}/api/bundle?email=a@x.test&device=TV&enrolment=CODEA`);
@@ -526,6 +534,7 @@ test("a full house refuses a new device with seat_limit_reached", async () => {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const first = await fetch(`${inst.url}/api/bundle?email=cap@test&device=TV&enrolment=CODE1`);
@@ -547,6 +556,7 @@ test("a device can free its own seat, and only its own", async () => {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: reg,
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const first = await fetch(`${inst.url}/api/bundle?email=cap@test&device=TV&enrolment=CODE1`);
@@ -586,6 +596,7 @@ test("a revoke without an id or secret is refused", async () => {
     store: new EntitlementStore({ file: join(dir, "rev1.json") }),
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const res = await fetch(`${inst.url}/api/devices`, { method: "DELETE" });
@@ -607,6 +618,7 @@ test("two simultaneous checkouts create only one session", async () => {
       secret: "sk",
     },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const body = JSON.stringify({ plan: "family", email: "race@test" });
@@ -628,6 +640,7 @@ test("an operator can list which devices hold seats", async () => {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     await fetch(`${inst.url}/api/bundle?email=cap@test&device=Living+room&enrolment=CODE1`);
@@ -650,6 +663,7 @@ test("a device list for an unknown email is 404, and without an email is 400", a
     store: new EntitlementStore({ file: join(dir, "list2.json") }),
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const none = await fetch(`${inst.url}/api/devices`);
@@ -672,6 +686,7 @@ test("the sweep reclaims a seat from a device that stopped checking in", async (
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: reg,
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     await fetch(`${inst.url}/api/bundle?email=cap@test&device=Gone&enrolment=CODE1`);
@@ -700,6 +715,7 @@ test("sweeping without an email is 400 and for an unknown one is 404", async () 
     store: new EntitlementStore({ file: join(dir, "sweep2.json") }),
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const none = await fetch(`${inst.url}/api/devices/sweep`, { method: "POST" });
@@ -726,6 +742,7 @@ test("a stranger who knows the email cannot register a device", async () => {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const noCode = await fetch(`${inst.url}/api/bundle?email=victim@test&device=junk`);
@@ -757,6 +774,7 @@ test("the enrolment code is case-insensitive but must be exact", async () => {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const lower = await fetch(`${inst.url}/api/bundle?email=case@test&device=TV&enrolment=familycode`);
@@ -781,6 +799,7 @@ test("the entitlement route never leaks the enrolment hash", async () => {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: reg,
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const first = await fetch(
@@ -816,6 +835,7 @@ test("a device secret for one email cannot read another email's status", async (
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk" },
     devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
   });
   try {
     const first = await fetch(`${inst.url}/api/bundle?email=a@hold.test&device=TV&enrolment=CODEA`);
@@ -850,5 +870,52 @@ test("the bundle route refuses a caller who floods it", async () => {
     assert.equal(codes.filter((c) => c === 429).length, 5, "3 allowed, 5 refused");
   } finally {
     await inst.close();
+  }
+});
+
+test("a redelivered webhook does not mint a second enrolment code", async () => {
+  process.env.STRIPE_WEBHOOK_SECRET = SECRET;
+  const store = new EntitlementStore({ file: join(dir, "idem.json") });
+  const signed = await startServer(0, {
+    store,
+    stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
+    devices: new DeviceRegistry(),
+    events: new EventLog(join(dir, `events-${Math.random().toString(36).slice(2,8)}.json`)),
+  });
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    const body = JSON.stringify({
+      id: "evt_idem_1",
+      type: "checkout.session.completed",
+      created: now,
+      data: { object: { metadata: { plan: "family", email: "idem@test" } } },
+    });
+    const ts = Math.floor(Date.now() / 1000);
+    const digest = createHmac("sha256", SECRET).update(`${ts}.${body}`, "utf8").digest("hex");
+
+    const first = await fetch(`${signed.url}/api/webhook`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "stripe-signature": `t=${ts},v1=${digest}` },
+      body,
+    });
+    assert.equal(first.status, 200);
+    const firstHash = store.get("idem@test")?.enrolment_hash;
+
+    // Same event id, delivered again.
+    const second = await fetch(`${signed.url}/api/webhook`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "stripe-signature": `t=${ts},v1=${digest}` },
+      body,
+    });
+    assert.equal(second.status, 200);
+    assert.deepEqual(await second.json(), { received: true, ignored: true });
+    assert.equal(
+      store.get("idem@test")?.enrolment_hash,
+      firstHash,
+      "a replay must not rotate the enrolment code the family was given",
+    );
+  } finally {
+    await signed.close();
+    delete process.env.STRIPE_WEBHOOK_SECRET;
   }
 });

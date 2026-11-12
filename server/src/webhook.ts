@@ -132,6 +132,13 @@ function emailOf(obj: StripeObject): string {
  */
 export interface DispatchDeps {
   /**
+   * Records an event id as handled, returning false when it was already seen.
+   *
+   * Stripe delivers at least once. Without this a redelivered grant mints a new
+   * enrolment code and invalidates the one the family was given.
+   */
+  claimEvent?: (id: string) => boolean;
+  /**
    * Called when a subscription ends, so the caller can release that family's
    * devices.
    *
@@ -150,6 +157,11 @@ export async function dispatchEvent(
 ): Promise<WebhookResult> {
   const type = typeof event.type === "string" ? event.type : "";
   const created = typeof event.created === "number" ? event.created : nowSeconds;
+
+  // Idempotency. A replay is acknowledged and dropped, so a grant cannot run twice.
+  if (event.id && deps.claimEvent && !deps.claimEvent(event.id)) {
+    return { ok: true, received: true, ignored: true, event: type };
+  }
   const obj = event.data?.object ?? {};
 
   switch (type) {

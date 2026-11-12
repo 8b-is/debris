@@ -78,6 +78,57 @@ export interface StoreOptions {
  * write tmp + fsync + rename, survive a power loss. Rather than a second copy of
  * the same logic, the mechanics live here and each store supplies its own shape.
  */
+/**
+ * Ids of webhook events already applied.
+ *
+ * Stripe delivers at least once, so the same event can arrive twice. Re-running a
+ * grant is not idempotent: it mints a fresh enrolment code, which silently
+ * invalidates the one already printed to the family.
+ */
+export class EventLog {
+  #seen = new Set<string>();
+  #file: string;
+
+  constructor(file: string) {
+    this.#file = file;
+    try {
+      const raw = JSON.parse(readFileSync(file, "utf8")) as unknown;
+      if (Array.isArray(raw)) for (const id of raw) if (typeof id === "string") this.#seen.add(id);
+    } catch {
+      // Missing or corrupt log starts empty: failing to record is better than
+      // refusing to serve.
+    }
+  }
+
+  /** True the first time an id is seen; false on every replay. */
+  claim(id: string): boolean {
+    if (!id) return true; // no id, nothing to dedupe on
+    if (this.#seen.has(id)) return false;
+    this.#seen.add(id);
+    void this.#persist();
+    return true;
+  }
+
+  get size(): number {
+    return this.#seen.size;
+  }
+
+  async #persist(): Promise<void> {
+    const dir = dirname(this.#file);
+    mkdirSync(dir, { recursive: true });
+    const ids = [...this.#seen];
+    const tmp = `${this.#file}.${process.pid}.${Date.now()}.tmp`;
+    const fd = openSync(tmp, "w", LEDGER_FILE_MODE);
+    try {
+      writeSync(fd, `${JSON.stringify(ids)}\n`);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    renameSync(tmp, this.#file);
+  }
+}
+
 export class JsonStore<T> {
   readonly file: string;
   #value: T;

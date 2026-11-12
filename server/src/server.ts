@@ -7,6 +7,8 @@
  */
 
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { audit } from "./audit.ts";
 import {
@@ -23,7 +25,7 @@ import { DeviceRegistry, loadDevices, secretMatches } from "./devices.ts";
 import { RateLimiter } from "./ratelimit.ts";
 import { createBundle } from "./manifest.ts";
 import { PLAN_LIST } from "./plans.ts";
-import { EntitlementStore, isActiveNow, normalizeEmail } from "./store.ts";
+import { EntitlementStore, EventLog, isActiveNow, normalizeEmail } from "./store.ts";
 import { CheckoutError, createCheckoutSession, type StripeDeps } from "./stripe.ts";
 import { handleWebhook } from "./webhook.ts";
 
@@ -32,6 +34,7 @@ export interface ServerDeps {
   stripe?: StripeDeps;
   devices?: DeviceRegistry;
   limiter?: RateLimiter;
+  events?: EventLog;
 }
 
 /**
@@ -48,7 +51,13 @@ export interface DebrisServer {
   url: string;
   store: EntitlementStore;
   devices: DeviceRegistry;
+  events: EventLog;
   close: () => Promise<void>;
+}
+
+/** Where the processed-event log lives. */
+function eventsFile(): string {
+  return join(dirname(fileURLToPath(import.meta.url)), "..", "data", "events.json");
 }
 
 /** The caller's identity for rate limiting: the forwarded address, or the socket. */
@@ -143,6 +152,7 @@ function readJsonBody(
 export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
   const store = deps.store ?? new EntitlementStore();
   const devices = deps.devices ?? loadDevices();
+  const events = deps.events ?? new EventLog(eventsFile());
   const limiter =
     deps.limiter ??
     new RateLimiter({ capacity: BUNDLE_RATE_BURST, windowMs: 1000 / BUNDLE_RATE_PER_SECOND });
@@ -319,6 +329,7 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
           process.env.STRIPE_WEBHOOK_SECRET,
           Math.floor(Date.now() / 1000),
           {
+            claimEvent: (id) => events.claim(id),
             onSubscriptionEnded: (email) => {
               const released = devices.releaseAllForEmail(email);
               for (const id of released) {
@@ -464,6 +475,7 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
     url: "",
     store,
     devices,
+    events,
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
