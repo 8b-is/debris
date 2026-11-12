@@ -145,7 +145,7 @@ DELETE /api/devices?id=           200 {revoked,id}   (Authorization: Bearer <dev
 POST /api/devices/sweep?email=     200 {swept,ids}    reclaim seats from stale devices
 POST /api/checkout   {plan, email} 200 {url, session_id}
 POST /api/webhook                  Stripe events, HMAC-SHA256 verified
-GET  /api/entitlement?email=       200 {email, plan, seats, status, valid_until}
+GET  /api/entitlement?email=       200 {email,plan,seats,status,valid_until,device}   (Bearer <device secret>)
 ```
 
 Every error is `{error: "<string>"}`. The complete set — a client may branch on
@@ -162,6 +162,7 @@ these and on nothing else:
 | 400 | `read_failed` | the request body errored mid-read |
 | 400 | `read_timeout` | the body did not arrive within 10 s |
 | 400 | `device_required` | a device revoke asked without an id or a secret |
+| 401 | `device_secret_required` | a private route was asked for without a device secret |
 | 401 | `invalid_device_secret` | a device secret was offered and did not match that email |
 | 402 | `payment_required` | bundle asked for a record that is free, lapsed, or past due |
 | 403 | `enrolment_required` | a new device registered without a valid family enrolment code |
@@ -233,7 +234,7 @@ The ADRs are accepted. The landing and the server are built to
 What is built: the entitlement ledger, the tier table, the addon manifest, the
 configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
 HMAC-verified webhooks that fail closed, an audit line for every entitlement change,
-and a restart that drains in-flight grants instead of dropping them. 114 tests,
+and a restart that drains in-flight grants instead of dropping them. 118 tests,
 offline.
 
 **A new device must prove it belongs to the family.** Knowing an email is not proof:
@@ -262,10 +263,11 @@ devices still registered.
 the Stripe call are not atomic, so a per-email in-flight guard turns the second into a
 409 rather than a second charge.
 
-**`GET /api/entitlement` is still unauthenticated.** It takes an email and returns a
-record. `/api/bundle` now requires a device secret, but this route does not, so
-anyone who knows a family member's address can still read their plan. It is the last
-piece of the authentication gap, and it is what keeps this service on localhost. See
+**No route is unauthenticated any more.** `GET /api/entitlement` was the last one: it
+returned the raw record, which after the enrolment work included the enrolment hash —
+a password-equivalent, readable by anyone who knew an email, and enough to register
+devices on the account. It now requires a device secret and returns only the plan,
+seats, status, expiry, and the asking device's own name. See
 [ADR 0005](docs/adr/0005-unauthenticated-until-deployed.md).
 
 What is not built: **the credential broker** — nothing in this service stores a

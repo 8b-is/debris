@@ -12,6 +12,14 @@ import { startServer, type DebrisServer } from "../src/server.ts";
 
 const SECRET = "whsec_route_test_secret";
 
+/** Every console.log line this process has emitted, so tests can read the log. */
+const capturedLog: string[] = [];
+const realLog = console.log;
+console.log = (...args: unknown[]): void => {
+  capturedLog.push(args.map(String).join(" "));
+  realLog.apply(console, args as []);
+};
+
 let dir: string;
 let instance: DebrisServer;
 
@@ -45,6 +53,19 @@ async function fakeStripeFetch(
       url: `https://checkout.stripe.test/c/cs_test_123?plan=${new URLSearchParams(init.body).get("client_reference_id")}`,
     }),
   };
+}
+
+/**
+ * The enrolment code a grant printed, read back from the captured console.
+ *
+ * The code is shown once and stored hashed, so a test cannot recompute it; the log
+ * is the only place it exists in the clear, which is exactly the property under
+ * test.
+ */
+function enrolmentFromLog(_server: unknown): string | null {
+  const line = [...capturedLog].reverse().find((l) => l.includes("enrolment code for"));
+  const match = line ? /enrolment code for .*: ([A-Z0-9]+)\s*$/.exec(line) : null;
+  return match?.[1] ?? null;
 }
 
 /**
@@ -198,7 +219,9 @@ test("a correctly signed checkout grant persists and is readable", async () => {
     devices: new DeviceRegistry(),
   });
   try {
-    const created = 1_760_000_000;
+    // A recent `created`: the grant sets valid_until one month out, so a 2025
+    // timestamp would be expired on arrival and correctly refused.
+    const created = Math.floor(Date.now() / 1000);
     const body = JSON.stringify({
       id: "evt_1",
       type: "checkout.session.completed",
@@ -215,12 +238,34 @@ test("a correctly signed checkout grant persists and is readable", async () => {
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), { received: true });
 
-    const ent = await fetch(`${signed.url}/api/entitlement?email=grantee@test`);
+    // The webhook grant prints the enrolment code, which is how a real family
+    // learns it. Capture it from the server log rather than guessing.
+    const printed = enrolmentFromLog(signed);
+    assert.ok(printed, "the grant must print an enrolment code");
+
+    // The entitlement route now needs a device secret, and never returns the
+    // enrolment hash: it was a password-equivalent readable by anyone.
+    const open = await fetch(`${signed.url}/api/entitlement?email=grantee@test`);
+    assert.equal(open.status, 401, "no secret, no record");
+
+    const reg = await fetch(
+      `${signed.url}/api/bundle?email=grantee@test&device=Laptop&enrolment=${printed}`,
+    );
+    assert.equal(reg.status, 200, "the printed code must register a device");
+    const { device_secret } = await reg.json();
+    const ent = await fetch(`${signed.url}/api/entitlement?email=grantee@test`, {
+      headers: { authorization: `Bearer ${device_secret}` },
+    });
     assert.equal(ent.status, 200);
     const record = await ent.json();
     assert.equal(record.plan, "household");
     assert.equal(record.status, "active");
     assert.equal(record.seats, 12);
+    assert.equal(
+      JSON.stringify(record).includes("enrolment"),
+      false,
+      "the enrolment hash must never leave the store",
+    );
   } finally {
     await signed.close();
     delete process.env.STRIPE_WEBHOOK_SECRET;
@@ -716,6 +761,71 @@ test("the enrolment code is case-insensitive but must be exact", async () => {
   try {
     const lower = await fetch(`${inst.url}/api/bundle?email=case@test&device=TV&enrolment=familycode`);
     assert.equal(lower.status, 200, "read down a phone line, case must not matter");
+  } finally {
+    await inst.close();
+  }
+});
+
+test("the entitlement route never leaks the enrolment hash", async () => {
+  const store = new EntitlementStore({ file: join(dir, "nohash.json") });
+  await store.put({
+    email: "secret@hold.test",
+    plan: "household",
+    seats: 12,
+    status: "active",
+    valid_until: null,
+    enrolment_hash: hashSecret("TOPSECRET"),
+  });
+  const reg = new DeviceRegistry();
+  const inst = await startServer(0, {
+    store,
+    stripe: { fetch: fakeStripeFetch, secret: "sk" },
+    devices: reg,
+  });
+  try {
+    const first = await fetch(
+      `${inst.url}/api/bundle?email=secret@hold.test&device=TV&enrolment=TOPSECRET`,
+    );
+    const { device_secret } = await first.json();
+
+    const res = await fetch(`${inst.url}/api/entitlement?email=secret@hold.test`, {
+      headers: { authorization: `Bearer ${device_secret}` },
+    });
+    assert.equal(res.status, 200);
+    const raw = await res.text();
+    assert.equal(raw.includes("enrolment"), false, "the hash must never be served");
+    assert.equal(raw.includes("TOPSECRET"), false, "nor the code it came from");
+  } finally {
+    await inst.close();
+  }
+});
+
+test("a device secret for one email cannot read another email's status", async () => {
+  const store = new EntitlementStore({ file: join(dir, "crossread.json") });
+  for (const [email, code] of [["a@hold.test", "CODEA"], ["b@hold.test", "CODEB"]] as const) {
+    await store.put({
+      email,
+      plan: "household",
+      seats: 12,
+      status: "active",
+      valid_until: null,
+      enrolment_hash: hashSecret(code),
+    });
+  }
+  const inst = await startServer(0, {
+    store,
+    stripe: { fetch: fakeStripeFetch, secret: "sk" },
+    devices: new DeviceRegistry(),
+  });
+  try {
+    const first = await fetch(`${inst.url}/api/bundle?email=a@hold.test&device=TV&enrolment=CODEA`);
+    const { device_secret } = await first.json();
+
+    const cross = await fetch(`${inst.url}/api/entitlement?email=b@hold.test`, {
+      headers: { authorization: `Bearer ${device_secret}` },
+    });
+    assert.equal(cross.status, 401, "a device is not a key to the whole ledger");
+    assert.deepEqual(await cross.json(), { error: "invalid_device_secret" });
   } finally {
     await inst.close();
   }

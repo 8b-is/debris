@@ -303,6 +303,12 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
         return;
       }
 
+      // The status of one subscription, for whoever holds a device on it.
+      //
+      // This used to be open and returned the whole record, which after the
+      // enrolment work included enrolment_hash: a password-equivalent, readable by
+      // anyone who knew an email, and enough to register devices on the account.
+      // It now requires a device secret and returns only what a device needs.
       if (method === "GET" && url.pathname === "/api/entitlement") {
         const email = normalizeEmail(url.searchParams.get("email"));
         const record = email ? store.get(email) : null;
@@ -310,7 +316,24 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
           json(res, 404, { error: "unknown_entitlement" });
           return;
         }
-        json(res, 200, record);
+        const presented = bearerToken(req.headers.authorization);
+        if (!presented) {
+          json(res, 401, { error: "device_secret_required" });
+          return;
+        }
+        const device = devices.authenticate(record.email, presented);
+        if (!device) {
+          json(res, 401, { error: "invalid_device_secret" });
+          return;
+        }
+        json(res, 200, {
+          email: record.email,
+          plan: record.plan,
+          seats: record.seats,
+          status: record.status,
+          valid_until: record.valid_until,
+          device: { id: device.id, name: device.name },
+        });
         return;
       }
 

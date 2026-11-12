@@ -84,6 +84,7 @@ test("the documented set is exactly the strings a client may branch on", async (
     "bad_payload",
     "bad_signature",
     "device_required",
+    "device_secret_required",
     "email_required",
     "enrolment_required",
     "internal",
