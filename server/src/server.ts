@@ -160,10 +160,21 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
           json(res, 400, { error: body.error });
           return;
         }
+        const email = typeof body.value.email === "string" ? body.value.email : "";
+
+        // A customer who is already active must not be sent to a second checkout:
+        // that is a second subscription and a second charge. A past_due record is
+        // allowed through, because that is exactly who needs to pay again.
+        const existing = normalizeEmail(email) ? store.get(normalizeEmail(email)) : null;
+        if (existing?.status === "active") {
+          json(res, 409, { error: "already_subscribed" });
+          return;
+        }
+
         try {
           const result = await createCheckoutSession(stripe, {
             plan: body.value.plan,
-            email: typeof body.value.email === "string" ? body.value.email : "",
+            email,
           });
           if (!stripeWarned && !result.configured) {
             stripeWarned = true;

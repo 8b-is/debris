@@ -79,6 +79,7 @@ test("the documented set is exactly the strings a client may branch on", async (
   // Pinned rather than merely cross-checked: an accidental deletion from both
   // sides would satisfy the two tests above.
   assert.deepEqual(documented, [
+    "already_subscribed",
     "bad_json",
     "bad_payload",
     "bad_signature",
@@ -93,4 +94,25 @@ test("the documented set is exactly the strings a client may branch on", async (
     "unknown_plan",
     "upstream_failed",
   ]);
+});
+test("the error table is sorted by status, so a reader can scan it", () => {
+  const md = readFileSync(README, "utf8");
+  const start = md.indexOf("Every error is `{error:");
+  const table = md.slice(start, md.indexOf("Errors are the server's own strings"));
+  const statuses: number[] = [];
+  for (const m of table.matchAll(/^\|\s*(\d{3})\s*\|\s*`([a-z_]+)`/gm)) {
+    statuses.push(Number(m[1]));
+  }
+  const sorted = [...statuses].sort((a, b) => a - b);
+  assert.deepEqual(
+    statuses,
+    sorted,
+    `rows must ascend by status code, got ${statuses.join(",")}`,
+  );
+});
+
+test("the error table lists each error once", () => {
+  const documented = documentedErrors();
+  const dupes = documented.filter((e, i) => documented.indexOf(e) !== i);
+  assert.deepEqual(dupes, [], `duplicated error rows: ${dupes.join(", ")}`);
 });

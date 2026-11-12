@@ -12,6 +12,7 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import { audit } from "./audit.ts";
 import { MS_PER_SECOND, WEBHOOK_TOLERANCE_SECONDS } from "./consts.ts";
 import { getPlan } from "./plans.ts";
 import {
@@ -153,6 +154,7 @@ export async function dispatchEvent(
         status: "active",
         valid_until: oneMonthAfter(created),
       });
+      audit({ event: "entitlement.granted", email, plan: plan.id, stripe_event: event.id });
       return { ok: true, received: true, event: type };
     }
 
@@ -181,6 +183,7 @@ export async function dispatchEvent(
         // An explicit cancel is the only thing that ends the period.
         valid_until: obj.status === "canceled" ? null : (existing?.valid_until ?? oneMonthAfter(created)),
       });
+      audit({ event: "entitlement.updated", email, plan: plan.id, stripe_event: event.id });
       return { ok: true, received: true, event: type };
     }
 
@@ -188,6 +191,7 @@ export async function dispatchEvent(
       const email = emailOf(obj);
       if (!email) return { ok: true, received: true, ignored: true, event: type };
       await store.put(freeEntitlement(email));
+      audit({ event: "entitlement.revoked", email, plan: "free", stripe_event: event.id });
       return { ok: true, received: true, event: type };
     }
 
@@ -202,6 +206,7 @@ export async function dispatchEvent(
         status: "past_due",
         valid_until: existing?.valid_until ?? null,
       });
+      audit({ event: "entitlement.past_due", email, plan: existing?.plan, stripe_event: event.id });
       return { ok: true, received: true, event: type };
     }
 

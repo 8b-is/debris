@@ -316,3 +316,54 @@ test("a hung payment upstream does not hang the request forever", async () => {
   const elapsed = Date.now() - started;
   assert.ok(elapsed < 15_000, `a hung upstream must be abandoned, took ${elapsed}ms`);
 });
+
+test("an already-active customer cannot start a second checkout", async () => {
+  const store = new EntitlementStore({ file: join(dir, "double.json") });
+  await store.put({
+    email: "active@buy.test",
+    plan: "household",
+    seats: 12,
+    status: "active",
+    valid_until: new Date(Date.now() + 86_400_000).toISOString(),
+  });
+  const double = await startServer(0, {
+    store,
+    stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
+  });
+  try {
+    const res = await fetch(`${double.url}/api/checkout`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ plan: "household", email: "active@buy.test" }),
+    });
+    assert.equal(res.status, 409, "a second subscription must not be creatable");
+    assert.deepEqual(await res.json(), { error: "already_subscribed" });
+  } finally {
+    await double.close();
+  }
+});
+
+test("a past_due customer can still check out again", async () => {
+  const store = new EntitlementStore({ file: join(dir, "pastdue.json") });
+  await store.put({
+    email: "late@buy.test",
+    plan: "family",
+    seats: 5,
+    status: "past_due",
+    valid_until: null,
+  });
+  const retry = await startServer(0, {
+    store,
+    stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
+  });
+  try {
+    const res = await fetch(`${retry.url}/api/checkout`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ plan: "family", email: "late@buy.test" }),
+    });
+    assert.equal(res.status, 200, "a lapsed customer must be able to pay again");
+  } finally {
+    await retry.close();
+  }
+});

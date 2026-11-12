@@ -155,11 +155,12 @@ these and on nothing else:
 | 400 | `payload_too_large` | body over 64 KiB |
 | 400 | `read_failed` | the request body errored mid-read |
 | 400 | `read_timeout` | the body did not arrive within 10 s |
-| 404 | `not_found` | unknown route |
 | 402 | `payment_required` | bundle asked for a record that is free or past due |
+| 404 | `not_found` | unknown route |
 | 404 | `unknown_entitlement` | no ledger entry for that email |
-| 502 | `upstream_failed` | Stripe returned a non-2xx |
+| 409 | `already_subscribed` | checkout asked for an email whose subscription is active |
 | 500 | `internal` | anything unhandled |
+| 502 | `upstream_failed` | Stripe returned a non-2xx |
 
 Errors are the server's own strings and are rendered verbatim by the client. A
 client that paraphrases a server error will eventually paraphrase it wrong.
@@ -217,7 +218,8 @@ The ADRs are accepted. The landing and the server are built to
 
 What is built: the entitlement ledger, the tier table, the addon manifest, the
 configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
-HMAC-verified webhooks that fail closed. 72 tests, offline.
+HMAC-verified webhooks that fail closed, and an audit line for every
+entitlement change. 82 tests, offline.
 
 **The entitlement and bundle routes have no authentication.** Anyone who knows a
 family member's email can read their plan and request a bundle in their name. The
