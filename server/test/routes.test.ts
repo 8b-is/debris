@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 
+import { DeviceRegistry } from "../src/devices.ts";
 import { EntitlementStore } from "../src/store.ts";
 import { startServer, type DebrisServer } from "../src/server.ts";
 
@@ -22,6 +23,7 @@ beforeEach(async () => {
   instance = await startServer(0, {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
+    devices: new DeviceRegistry(),
   });
 });
 
@@ -168,6 +170,7 @@ test("a correctly signed checkout grant persists and is readable", async () => {
   const signed = await startServer(0, {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
+    devices: new DeviceRegistry(),
   });
   try {
     const created = 1_760_000_000;
@@ -236,6 +239,7 @@ test("bundle for an unpaid record is 402 payment_required", async () => {
   const unpaid = await startServer(0, {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
+    devices: new DeviceRegistry(),
   });
   try {
     const res = await fetch(`${unpaid.url}/api/bundle?email=unpaid@test`);
@@ -258,6 +262,7 @@ test("a paid record gets a bundle with addons and no credential", async () => {
   const paid = await startServer(0, {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
+    devices: new DeviceRegistry(),
   });
   try {
     // First request registers the device and receives its secret once.
@@ -346,6 +351,7 @@ test("an already-active customer cannot start a second checkout", async () => {
   const double = await startServer(0, {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
+    devices: new DeviceRegistry(),
   });
   try {
     const res = await fetch(`${double.url}/api/checkout`, {
@@ -372,6 +378,7 @@ test("a past_due customer can still check out again", async () => {
   const retry = await startServer(0, {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
+    devices: new DeviceRegistry(),
   });
   try {
     const res = await fetch(`${retry.url}/api/checkout`, {
@@ -397,6 +404,7 @@ test("an expired customer cannot pull a bundle, and can still pay again", async 
   const inst = await startServer(0, {
     store,
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
+    devices: new DeviceRegistry(),
   });
   try {
     const bundle = await fetch(`${inst.url}/api/bundle?email=lapsed@buy.test`);
@@ -419,7 +427,11 @@ test("a device secret from one email does not work for another", async () => {
   for (const [email, plan] of [["a@x.test", "household"], ["b@x.test", "family"]] as const) {
     await store.put({ email, plan, seats: 12, status: "active", valid_until: null });
   }
-  const inst = await startServer(0, { store, stripe: { fetch: fakeStripeFetch, secret: "sk" } });
+  const inst = await startServer(0, {
+    store,
+    stripe: { fetch: fakeStripeFetch, secret: "sk" },
+    devices: new DeviceRegistry(),
+  });
   try {
     const first = await fetch(`${inst.url}/api/bundle?email=a@x.test&device=TV`);
     const { device_secret } = await first.json();
@@ -439,7 +451,11 @@ test("a full house refuses a new device with seat_limit_reached", async () => {
   await store.put({ email: "cap@test", plan: "free", seats: 1, status: "free", valid_until: null });
   // Give them one seat by making the plan household with 1 seat via the store.
   await store.put({ email: "cap@test", plan: "family", seats: 1, status: "active", valid_until: null });
-  const inst = await startServer(0, { store, stripe: { fetch: fakeStripeFetch, secret: "sk" } });
+  const inst = await startServer(0, {
+    store,
+    stripe: { fetch: fakeStripeFetch, secret: "sk" },
+    devices: new DeviceRegistry(),
+  });
   try {
     const first = await fetch(`${inst.url}/api/bundle?email=cap@test&device=TV`);
     assert.equal(first.status, 200);

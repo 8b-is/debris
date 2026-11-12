@@ -1,6 +1,6 @@
 # ADR 0005 — the entitlement and bundle routes are unauthenticated, on purpose, for now
 
-**Status:** accepted with a named expiry
+**Status:** partly superseded — device tokens landed; `/api/entitlement` is still open
 **Date:** 2026-11-12
 
 ---
@@ -68,13 +68,28 @@ device, count the live ones, refuse the one past the limit. Until they exist, th
 number on the pricing page is a promise the code cannot keep, and it is documented as
 such rather than left to be discovered.
 
+## What landed
+
+Device tokens are in. A device registers on its first bundle request, receives one
+secret, and presents it as `Authorization: Bearer <device>` afterwards. Secrets are
+stored as `sha256` and never in the clear. The registry persists to its own file, so a
+restart does not burn a seat per device.
+
+That closes the seat-enforcement gap named above: a household cap of twelve is refused
+at thirteen, and a reconnecting device does not consume a second seat.
+
+## What did not land
+
+`GET /api/entitlement` is still unauthenticated. It takes an email and returns a plan,
+a seat count, a status, and an expiry, and nothing checks who is asking. Device tokens
+do not help here, because a device is not a person: the caller of this route is the
+family member, not the television.
+
+The remaining options are a session cookie after checkout, or a signed short-lived
+link mailed to the address on the subscription. Neither is built.
+
 ## Expiry
 
 This ADR expires the moment the service is deployed to anything other than localhost.
-Before that happens, device tokens land: a per-device secret issued on first bundle
-request, stored in the ledger, sent as `Authorization: Bearer <device>`, and rotated by
-re-issuing. The routes then require it, and this ADR is replaced by the one that
-describes how it works.
-
 Until then, **do not deploy this**. The README's status section says the same thing in
 plainer words.
