@@ -147,3 +147,34 @@ test("a JsonStore refuses to be constructed without its own file", async () => {
     /must be given its own file/,
   );
 });
+
+test("a device not seen for a long time is swept, and a recent one is not", () => {
+  const reg = new DeviceRegistry();
+  const stale = reg.issue("dra@test", "Old phone")!;
+  const fresh = reg.issue("dra@test", "This TV")!;
+
+  // Backdate one by rewriting the record through the registry's own state.
+  const all = reg.all();
+  const old = all.find((d) => d.id === stale.device.id)!;
+  old.last_seen_at = new Date(Date.now() - 200 * 86_400_000).toISOString();
+
+  const removed = reg.sweepStale(90);
+  assert.deepEqual(removed, [stale.device.id]);
+  assert.equal(reg.count("dra@test"), 1);
+  assert.equal(reg.get(fresh.device.id)?.id, fresh.device.id, "the active device stays");
+});
+
+test("a device whose last_seen is unparseable is swept, not kept forever", () => {
+  const reg = new DeviceRegistry();
+  reg.issue("dra@test", "Broken");
+  for (const d of reg.all()) d.last_seen_at = "never";
+  assert.equal(reg.sweepStale(90).length, 1);
+  assert.equal(reg.count("dra@test"), 0);
+});
+
+test("a sweep with nothing stale changes nothing", () => {
+  const reg = new DeviceRegistry();
+  reg.issue("dra@test", "TV");
+  assert.deepEqual(reg.sweepStale(90), []);
+  assert.equal(reg.count("dra@test"), 1);
+});

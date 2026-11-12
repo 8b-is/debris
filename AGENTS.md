@@ -10,7 +10,7 @@ type stripping — there is no build step, no bundler, and no `node_modules`.
 ```bash
 cd ~/workspace/peterlodri-sec/8b-is-debris
 scripts/verify.sh            # syntax check every source, then the whole suite
-node --test server/test/     # 109 tests, offline, no network
+node --test server/test/     # 114 tests, offline, no network
 node server/src/server.ts    # serves on PORT, default 8787
 ```
 
@@ -51,6 +51,9 @@ node server/src/server.ts    # serves on PORT, default 8787
   cannot make a third-party player honour a filter. The docs say "asks for" and
   "prefers"; do not upgrade that to "forces" without a component in this repo that
   actually filters, and do not imply the service can police a device it does not run on.
+- **A stale device is swept on request, never on a read.** `last_seen_at` is recorded so
+  seats can be reclaimed, and `sweepStale` only runs from the explicit sweep route. A
+  family away for a month must not come home deregistered.
 - **A device has one secret, stored hashed.** `devices.ts` keeps `sha256(secret)` and
   never the secret. A registry file must not be enough to impersonate a device, which
   is the reason a token exists instead of trusting an email.
@@ -78,7 +81,7 @@ server/src/webhook.ts     HMAC-SHA256 verification and event dispatch
 server/src/server.ts      the five routes
 server/src/audit.ts       one-line audit trail for every entitlement change
 server/src/devices.ts     the device registry: hashed secrets, seats, persistence
-server/test/              109 offline tests, including landing, README, audit, and device parity
+server/test/              114 offline tests, including landing, README, audit, and device parity
 landing/                  static page: index.html, landing.css, tokens.css, app.js
 docs/adr/                 the five decisions, each with what would change it
 docs/ELI5.md              what it is, for a ten-year-old

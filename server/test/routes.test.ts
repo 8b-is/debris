@@ -592,3 +592,50 @@ test("a device list for an unknown email is 404, and without an email is 400", a
     await inst.close();
   }
 });
+
+test("the sweep reclaims a seat from a device that stopped checking in", async () => {
+  const store = new EntitlementStore({ file: join(dir, "sweep.json") });
+  await store.put({ email: "cap@test", plan: "household", seats: 2, status: "active", valid_until: null });
+  const reg = new DeviceRegistry();
+  const inst = await startServer(0, {
+    store,
+    stripe: { fetch: fakeStripeFetch, secret: "sk" },
+    devices: reg,
+  });
+  try {
+    await fetch(`${inst.url}/api/bundle?email=cap@test&device=Gone`);
+    await fetch(`${inst.url}/api/bundle?email=cap@test&device=Here`);
+
+    // Backdate one device to make it stale.
+    for (const d of reg.all()) {
+      if (d.name === "Gone") d.last_seen_at = new Date(Date.now() - 200 * 86_400_000).toISOString();
+    }
+
+    const res = await fetch(`${inst.url}/api/devices/sweep?email=cap@test`, { method: "POST" });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.swept, 1, "exactly the stale device");
+    assert.equal(body.ids.length, 1);
+
+    const after = await (await fetch(`${inst.url}/api/devices?email=cap@test`)).json();
+    assert.equal(after.used, 1, "the seat is free again");
+  } finally {
+    await inst.close();
+  }
+});
+
+test("sweeping without an email is 400 and for an unknown one is 404", async () => {
+  const inst = await startServer(0, {
+    store: new EntitlementStore({ file: join(dir, "sweep2.json") }),
+    stripe: { fetch: fakeStripeFetch, secret: "sk" },
+    devices: new DeviceRegistry(),
+  });
+  try {
+    const none = await fetch(`${inst.url}/api/devices/sweep`, { method: "POST" });
+    assert.equal(none.status, 400);
+    const unknown = await fetch(`${inst.url}/api/devices/sweep?email=nobody@x.test`, { method: "POST" });
+    assert.equal(unknown.status, 404);
+  } finally {
+    await inst.close();
+  }
+});

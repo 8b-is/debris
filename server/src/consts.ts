@@ -35,6 +35,14 @@ export const UPSTREAM_TIMEOUT_MS = 10_000;
 export const SHUTDOWN_GRACE_MS = 15_000;
 
 /**
+ * A device not seen for this many days is stale enough to sweep.
+ *
+ * Ninety days is longer than any plausible family holiday and shorter than the
+ * time it takes a house to fill with abandoned tablets.
+ */
+export const DEVICE_STALE_DAYS = 90;
+
+/**
  * Version reported by /healthz.
  *
  * Read from package.json at import so a release is one edit in one file. If the

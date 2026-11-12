@@ -142,6 +142,7 @@ GET  /api/plans                    200 {plans:[{id,name,cents,seats,features}]}
 GET  /api/bundle?email=            200 {tier,seats,addons,subtitle_languages,forced_filters,expires_at,...}
 GET  /api/devices?email=           200 {email,seats,used,devices:[{id,name,created_at,last_seen_at}]}
 DELETE /api/devices?id=           200 {revoked,id}   (Authorization: Bearer <device secret>)
+POST /api/devices/sweep?email=     200 {swept,ids}    reclaim seats from stale devices
 POST /api/checkout   {plan, email} 200 {url, session_id}
 POST /api/webhook                  Stripe events, HMAC-SHA256 verified
 GET  /api/entitlement?email=       200 {email, plan, seats, status, valid_until}
@@ -231,7 +232,7 @@ The ADRs are accepted. The landing and the server are built to
 What is built: the entitlement ledger, the tier table, the addon manifest, the
 configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
 HMAC-verified webhooks that fail closed, an audit line for every entitlement change,
-and a restart that drains in-flight grants instead of dropping them. 109 tests,
+and a restart that drains in-flight grants instead of dropping them. 114 tests,
 offline.
 
 **Seats are now enforced, by device.** A device is one physical thing that asks for a
@@ -244,6 +245,11 @@ seat per device.
 seats and when each was last seen; `DELETE /api/devices?id=` with that device's secret
 releases one, so a lost phone does not hold a seat forever. Both are audited, and the
 audit line now names the device.
+
+**Seats are reclaimed, not just freed.** `POST /api/devices/sweep` drops any device
+unseen for 90 days, so a phone sold in spring does not hold a seat at Christmas. It
+runs on request, never on a read: a family away for a month comes home to its
+devices still registered.
 
 **Two taps in the same second make one session.** The active-subscription check and
 the Stripe call are not atomic, so a per-email in-flight guard turns the second into a

@@ -169,6 +169,31 @@ export class DeviceRegistry {
     return { ...found };
   }
 
+  /**
+   * Drop devices that have not been seen for `staleDays`.
+   *
+   * `last_seen_at` was recorded and never acted on, so a phone sold in March still
+   * held a seat in November and the family cap slowly filled with ghosts. Returns
+   * the ids it removed, so the caller can audit them.
+   *
+   * Devices are only removed on an explicit sweep, never as a side effect of a
+   * read: a family that is away for a month must not come home to find its TVs
+   * deregistered.
+   */
+  sweepStale(staleDays: number, now: number = Date.now()): string[] {
+    const cutoff = now - staleDays * 86_400_000;
+    const removed: string[] = [];
+    for (const d of Object.values(this.#devices)) {
+      const seen = Date.parse(d.last_seen_at);
+      if (Number.isNaN(seen) || seen < cutoff) {
+        delete this.#devices[d.id];
+        removed.push(d.id);
+      }
+    }
+    if (removed.length > 0) this.#changed();
+    return removed;
+  }
+
   /** Revoke one device by id. Returns false when it does not exist. */
   revoke(id: string): boolean {
     if (!this.#devices[id]) return false;

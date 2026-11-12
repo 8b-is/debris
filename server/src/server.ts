@@ -9,7 +9,14 @@
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
 import { audit } from "./audit.ts";
-import { BODY_TIMEOUT_MS, DEFAULT_PORT, MAX_BODY_BYTES, SHUTDOWN_GRACE_MS, VERSION } from "./consts.ts";
+import {
+  BODY_TIMEOUT_MS,
+  DEFAULT_PORT,
+  DEVICE_STALE_DAYS,
+  MAX_BODY_BYTES,
+  SHUTDOWN_GRACE_MS,
+  VERSION,
+} from "./consts.ts";
 import { DeviceRegistry, loadDevices, secretMatches } from "./devices.ts";
 import { createBundle } from "./manifest.ts";
 import { PLAN_LIST } from "./plans.ts";
@@ -322,6 +329,26 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
             last_seen_at: d.last_seen_at,
           })),
         });
+        return;
+      }
+
+      // Reclaim seats from devices that stopped checking in. A phone sold in
+      // March otherwise holds a seat in November.
+      if (method === "POST" && url.pathname === "/api/devices/sweep") {
+        const email = normalizeEmail(url.searchParams.get("email"));
+        if (!email) {
+          json(res, 400, { error: "email_required" });
+          return;
+        }
+        if (!store.get(email)) {
+          json(res, 404, { error: "unknown_entitlement" });
+          return;
+        }
+        const removed = devices.sweepStale(DEVICE_STALE_DAYS);
+        for (const id of removed) {
+          audit({ event: "device.swept", email, device: id });
+        }
+        json(res, 200, { swept: removed.length, ids: removed });
         return;
       }
 
