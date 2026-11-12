@@ -8,7 +8,7 @@
 
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
-import { BODY_TIMEOUT_MS, DEFAULT_PORT, MAX_BODY_BYTES, VERSION } from "./consts.ts";
+import { BODY_TIMEOUT_MS, DEFAULT_PORT, MAX_BODY_BYTES, SHUTDOWN_GRACE_MS, VERSION } from "./consts.ts";
 import { createBundle } from "./manifest.ts";
 import { PLAN_LIST } from "./plans.ts";
 import { EntitlementStore, isActiveNow, normalizeEmail } from "./store.ts";
@@ -269,4 +269,35 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const instance = await startServer(port);
   console.log(`debris: listening on ${instance.url}`);
   console.log(`debris: stripe ${process.env.STRIPE_SECRET_KEY ? "configured" : "unconfigured"}`);
+
+  // A webhook in flight is a grant in progress. Closing the listener and then
+  // waiting for the open requests to finish is the difference between a restart
+  // that costs nothing and one that loses a customer's payment.
+  let shuttingDown = false;
+  const shutdown = (signal: string): void => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`debris: ${signal} received, draining`);
+
+    const force = setTimeout(() => {
+      console.log("debris: drain exceeded, forcing exit");
+      process.exit(1);
+    }, SHUTDOWN_GRACE_MS);
+    force.unref?.();
+
+    void instance.close().then(
+      () => {
+        clearTimeout(force);
+        console.log("debris: drained, closing");
+        process.exit(0);
+      },
+      (err: unknown) => {
+        console.error("debris: close failed", err);
+        process.exit(1);
+      },
+    );
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }

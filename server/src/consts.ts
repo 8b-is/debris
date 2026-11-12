@@ -31,6 +31,9 @@ export const BODY_TIMEOUT_MS = 10_000;
 /** How long a payment call may take before it is abandoned, in milliseconds. */
 export const UPSTREAM_TIMEOUT_MS = 10_000;
 
+/** How long a restart may take to drain before it gives up and exits. */
+export const SHUTDOWN_GRACE_MS = 15_000;
+
 /**
  * Version reported by /healthz.
  *
