@@ -129,6 +129,21 @@ async function startCheckout(plan, emailInput, alertEl, buttons) {
   if (!plan) return;
 
   clearError(alertEl);
+
+  // The form carries `novalidate`, so the browser will not check the field for
+  // us. Without this, "not-an-email" is POSTed and comes back as email_required,
+  // which is a worse answer than saying so before the request.
+  if (!email) {
+    showError(alertEl, "email_required");
+    emailInput?.focus();
+    return;
+  }
+  if (emailInput && !emailInput.checkValidity()) {
+    showError(alertEl, "invalid_email");
+    emailInput.focus();
+    return;
+  }
+
   for (const b of buttons) b.disabled = true;
 
   try {
