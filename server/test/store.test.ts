@@ -7,8 +7,11 @@ import { afterEach, beforeEach, test } from "node:test";
 import {
   EntitlementStore,
   freeEntitlement,
+  isActiveNow,
+  isExpired,
   normalizeEmail,
   oneMonthAfter,
+  type Entitlement,
 } from "../src/store.ts";
 
 let dir: string;
@@ -159,4 +162,53 @@ test("two stores writing in sequence both land, proving the sync completes", asy
   await b.put({ email: "seq2@test", plan: "household", seats: 12, status: "active", valid_until: null });
   const c = new EntitlementStore({ file });
   assert.equal(c.all().length, 2, "both writes must survive a reopen");
+});
+
+test("an expired record is not active, even when status still says active", () => {
+  // status and valid_until are written by different events and can disagree.
+  const expired: Entitlement = {
+    email: "lapsed@test",
+    plan: "household",
+    seats: 12,
+    status: "active",
+    valid_until: new Date(Date.now() - 86_400_000).toISOString(),
+  };
+  assert.equal(isExpired(expired), true);
+  assert.equal(isActiveNow(expired), false);
+});
+
+test("a record whose period is still open is active", () => {
+  const live: Entitlement = {
+    email: "live@test",
+    plan: "family",
+    seats: 5,
+    status: "active",
+    valid_until: new Date(Date.now() + 86_400_000).toISOString(),
+  };
+  assert.equal(isExpired(live), false);
+  assert.equal(isActiveNow(live), true);
+});
+
+test("a free record is never expired", () => {
+  const free: Entitlement = {
+    email: "free@test",
+    plan: "free",
+    seats: 1,
+    status: "free",
+    valid_until: null,
+  };
+  assert.equal(isExpired(free), false);
+  assert.equal(isActiveNow(free), false);
+});
+
+test("an unparseable expiry is treated as expired, not as forever", () => {
+  const broken: Entitlement = {
+    email: "broken@test",
+    plan: "family",
+    seats: 5,
+    status: "active",
+    valid_until: "not-a-date",
+  };
+  assert.equal(isExpired(broken), true);
+  assert.equal(isActiveNow(broken), false);
 });

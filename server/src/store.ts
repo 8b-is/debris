@@ -23,6 +23,26 @@ import { PLANS, type PlanId } from "./plans.ts";
 
 export type EntitlementStatus = "active" | "past_due" | "free";
 
+/**
+ * True when a record's paid period has ended.
+ *
+ * `status` and `valid_until` are written by different events and can disagree: a
+ * subscription can be cancelled at period end without Stripe sending a deletion
+ * immediately. Reading only `status` would keep an expired customer served.
+ */
+export function isExpired(record: Entitlement, now: number = Date.now()): boolean {
+  if (record.status === "free") return false;
+  if (!record.valid_until) return false;
+  const until = Date.parse(record.valid_until);
+  if (Number.isNaN(until)) return true;
+  return until <= now;
+}
+
+/** A record that may currently be served, or false when it lapsed. */
+export function isActiveNow(record: Entitlement, now: number = Date.now()): boolean {
+  return record.status === "active" && !isExpired(record, now);
+}
+
 export interface Entitlement {
   email: string;
   plan: PlanId;

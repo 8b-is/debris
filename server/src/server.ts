@@ -11,7 +11,7 @@ import { createServer as createHttpServer, type IncomingMessage, type Server, ty
 import { BODY_TIMEOUT_MS, DEFAULT_PORT, MAX_BODY_BYTES, VERSION } from "./consts.ts";
 import { createBundle } from "./manifest.ts";
 import { PLAN_LIST } from "./plans.ts";
-import { EntitlementStore, normalizeEmail } from "./store.ts";
+import { EntitlementStore, isActiveNow, normalizeEmail } from "./store.ts";
 import { CheckoutError, createCheckoutSession, type StripeDeps } from "./stripe.ts";
 import { handleWebhook } from "./webhook.ts";
 
@@ -136,7 +136,7 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
           json(res, 404, { error: "unknown_entitlement" });
           return;
         }
-        if (record.status !== "active") {
+        if (!isActiveNow(record)) {
           json(res, 402, { error: "payment_required" });
           return;
         }
@@ -166,7 +166,7 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
         // that is a second subscription and a second charge. A past_due record is
         // allowed through, because that is exactly who needs to pay again.
         const existing = normalizeEmail(email) ? store.get(normalizeEmail(email)) : null;
-        if (existing?.status === "active") {
+        if (existing && isActiveNow(existing)) {
           json(res, 409, { error: "already_subscribed" });
           return;
         }

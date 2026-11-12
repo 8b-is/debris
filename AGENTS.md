@@ -10,7 +10,7 @@ type stripping — there is no build step, no bundler, and no `node_modules`.
 ```bash
 cd ~/workspace/peterlodri-sec/8b-is-debris
 scripts/verify.sh            # syntax check every source, then the whole suite
-node --test server/test/     # 82 tests, offline, no network
+node --test server/test/     # 87 tests, offline, no network
 node server/src/server.ts    # serves on PORT, default 8787
 ```
 
@@ -67,7 +67,7 @@ server/src/stripe.ts      the checkout seam, injectable transport
 server/src/webhook.ts     HMAC-SHA256 verification and event dispatch
 server/src/server.ts      the five routes
 server/src/audit.ts       one-line audit trail for every entitlement change
-server/test/              82 offline tests, including landing, README, and audit parity
+server/test/              87 offline tests, including landing, README, and audit parity
 landing/                  static page: index.html, landing.css, tokens.css, app.js
 docs/adr/                 the five decisions, each with what would change it
 docs/ELI5.md              what it is, for a ten-year-old

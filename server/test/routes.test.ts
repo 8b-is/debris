@@ -367,3 +367,32 @@ test("a past_due customer can still check out again", async () => {
     await retry.close();
   }
 });
+
+test("an expired customer cannot pull a bundle, and can still pay again", async () => {
+  const store = new EntitlementStore({ file: join(dir, "expired.json") });
+  await store.put({
+    email: "lapsed@buy.test",
+    plan: "household",
+    seats: 12,
+    status: "active",
+    valid_until: new Date(Date.now() - 86_400_000).toISOString(),
+  });
+  const inst = await startServer(0, {
+    store,
+    stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
+  });
+  try {
+    const bundle = await fetch(`${inst.url}/api/bundle?email=lapsed@buy.test`);
+    assert.equal(bundle.status, 402, "an expired record must not be served");
+    assert.deepEqual(await bundle.json(), { error: "payment_required" });
+
+    const checkout = await fetch(`${inst.url}/api/checkout`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ plan: "household", email: "lapsed@buy.test" }),
+    });
+    assert.equal(checkout.status, 200, "an expired customer must be able to renew");
+  } finally {
+    await inst.close();
+  }
+});
