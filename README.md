@@ -196,6 +196,7 @@ docs/ELI5.md                  what it is, for a ten-year-old
 docs/adr/0001..0005           broker-not-host, integer cents, fail-closed webhook,
                              static standalone landing, unauthenticated-until-deployed
 scripts/verify.sh             syntax check + full suite
+scripts/mirror.sh             push both forges, refusing if either is unreachable
 server/src/consts.ts          the canonical constants: body cap, port, tolerance, mode
 server/src/plans.ts           the tier table — the only place a price lives
 server/src/store.ts           entitlement ledger, atomic writes
@@ -255,8 +256,11 @@ does not need**.
 | GitHub | <https://github.com/8b-is/debris> | live |
 | Codeberg | <https://codeberg.org/8b-is/debris> | live |
 
-Both carry the same `main`. Push to `origin`, then to `codeberg`; neither is
-authoritative over the other.
+Both carry the same `main`, and neither is authoritative over the other.
+
+```bash
+scripts/mirror.sh        # reachability check, then push both, then print all three SHAs
+```
 
 ---
 
