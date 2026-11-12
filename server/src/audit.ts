@@ -22,6 +22,10 @@ export interface AuditEntry {
   plan?: string;
   /** Stripe's event id, so a replay is visible as a duplicate. */
   stripe_event?: string;
+  /** The device this line is about, when it is about a device. */
+  device?: string;
+  /** The device's name, so the log reads without a lookup. */
+  name?: string;
 }
 
 /** Serialise one entry. Newline-delimited JSON: one object per line. */

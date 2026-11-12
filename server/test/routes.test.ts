@@ -549,3 +549,46 @@ test("two simultaneous checkouts create only one session", async () => {
     await inst.close();
   }
 });
+
+test("an operator can list which devices hold seats", async () => {
+  const store = new EntitlementStore({ file: join(dir, "list.json") });
+  await store.put({ email: "cap@test", plan: "household", seats: 12, status: "active", valid_until: null });
+  const inst = await startServer(0, {
+    store,
+    stripe: { fetch: fakeStripeFetch, secret: "sk" },
+    devices: new DeviceRegistry(),
+  });
+  try {
+    await fetch(`${inst.url}/api/bundle?email=cap@test&device=Living+room`);
+    await fetch(`${inst.url}/api/bundle?email=cap@test&device=Kitchen`);
+
+    const res = await fetch(`${inst.url}/api/devices?email=cap@test`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.used, 2);
+    assert.equal(body.seats, 12);
+    assert.deepEqual(body.devices.map((d: any) => d.name).sort(), ["Kitchen", "Living room"]);
+    assert.ok(body.devices.every((d: any) => !("secret_hash" in d)), "the list must not carry hashes");
+  } finally {
+    await inst.close();
+  }
+});
+
+test("a device list for an unknown email is 404, and without an email is 400", async () => {
+  const inst = await startServer(0, {
+    store: new EntitlementStore({ file: join(dir, "list2.json") }),
+    stripe: { fetch: fakeStripeFetch, secret: "sk" },
+    devices: new DeviceRegistry(),
+  });
+  try {
+    const none = await fetch(`${inst.url}/api/devices`);
+    assert.equal(none.status, 400);
+    assert.deepEqual(await none.json(), { error: "email_required" });
+
+    const unknown = await fetch(`${inst.url}/api/devices?email=nobody@x.test`);
+    assert.equal(unknown.status, 404);
+    assert.deepEqual(await unknown.json(), { error: "unknown_entitlement" });
+  } finally {
+    await inst.close();
+  }
+});

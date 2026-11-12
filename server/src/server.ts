@@ -197,6 +197,8 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
             event: "device.registered",
             email: record.email,
             plan: record.plan,
+            device: issued.device.id,
+            name: issued.device.name,
           });
           json(res, 200, { ...bundle, device_id: issued.device.id, device_secret: issued.secret });
           return;
@@ -291,6 +293,38 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
         return;
       }
 
+      // Who holds a seat, and since when. An operator looking at "12 of 12 seats
+      // used" needs to see the twelve; otherwise the only way to find the stale
+      // one is to guess device ids.
+      //
+      // Still unauthenticated, like /api/entitlement: it exposes device names and
+      // ids but no secret, and it is the inventory half of the same gap. The ids
+      // are useless without the matching secret.
+      if (method === "GET" && url.pathname === "/api/devices") {
+        const email = normalizeEmail(url.searchParams.get("email"));
+        if (!email) {
+          json(res, 400, { error: "email_required" });
+          return;
+        }
+        const record = store.get(email);
+        if (!record) {
+          json(res, 404, { error: "unknown_entitlement" });
+          return;
+        }
+        json(res, 200, {
+          email,
+          seats: record.seats,
+          used: devices.count(email),
+          devices: devices.forEmail(email).map((d) => ({
+            id: d.id,
+            name: d.name,
+            created_at: d.created_at,
+            last_seen_at: d.last_seen_at,
+          })),
+        });
+        return;
+      }
+
       // Free a seat. Without this a lost phone holds one forever and the family
       // cap is a leak: the only way to recover would be to delete the ledger by
       // hand. The device proves it owns the seat by presenting that device's
@@ -312,7 +346,7 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
           json(res, 404, { error: "unknown_device" });
           return;
         }
-        audit({ event: "device.revoked", email: device.email });
+        audit({ event: "device.revoked", email: device.email, device: device.id, name: device.name });
         json(res, 200, { revoked: true, id });
         return;
       }
