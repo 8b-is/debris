@@ -7,6 +7,7 @@
  * configured:false rather than throwing at import time.
  */
 
+import { UPSTREAM_TIMEOUT_MS } from "./consts.ts";
 import { getPlan, type PlanId } from "./plans.ts";
 
 export interface CheckoutRequest {
@@ -27,6 +28,7 @@ export type FetchLike = (
     method: string;
     headers: Record<string, string>;
     body: string;
+    signal?: AbortSignal;
   },
 ) => Promise<{
   ok: boolean;
@@ -106,6 +108,9 @@ export async function createCheckoutSession(
       "content-type": "application/x-www-form-urlencoded",
     },
     body: form.toString(),
+    // Without a deadline a hung Stripe pins the request forever, and every
+    // checkout socket in the process with it.
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
 
   if (!res.ok) {

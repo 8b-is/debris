@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import http from "node:http";
 import { createHmac } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -273,4 +274,45 @@ test("a paid record gets a bundle with addons and no credential", async () => {
   } finally {
     await paid.close();
   }
+});
+
+test("a stalled request body is refused with read_timeout, not left hanging", async () => {
+  const outcome = await new Promise<{ status: number; body: any; how: string }>((resolve) => {
+    const req = http.request(
+      `${instance.url}/api/checkout`,
+      { method: "POST", headers: { "content-type": "application/json" } },
+      (res) => {
+        let body = "";
+        res.on("data", (c) => (body += c));
+        res.on("end", () =>
+          resolve({ status: res.statusCode ?? 0, body: JSON.parse(body || "null"), how: "response" }),
+        );
+      },
+    );
+    req.on("error", (e) => resolve({ status: 0, body: e.message, how: "socket-error" }));
+    req.write('{"plan":"fam'); // never ended
+  });
+
+  assert.equal(outcome.how, "response", "the server must answer rather than hang the socket");
+  assert.equal(outcome.status, 400);
+  assert.equal(outcome.body.error, "read_timeout");
+});
+
+test("a hung payment upstream does not hang the request forever", async () => {
+  const { createCheckoutSession } = await import("../src/stripe.ts");
+  const started = Date.now();
+  await assert.rejects(() =>
+    createCheckoutSession(
+      {
+        fetch: (_url, init) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+          }),
+        secret: "sk_test_hang",
+      },
+      { plan: "family", email: "hang@test" },
+    ),
+  );
+  const elapsed = Date.now() - started;
+  assert.ok(elapsed < 15_000, `a hung upstream must be abandoned, took ${elapsed}ms`);
 });

@@ -25,8 +25,11 @@ export const MONTHS_PER_YEAR = 12;
 /** Milliseconds in a second, for the seconds-to-millis conversions Stripe forces on us. */
 export const MS_PER_SECOND = 1000;
 
-/** Restart the server after this many milliseconds of silence, in the fleet supervisor. */
-export const HEALTH_CHECK_INTERVAL_MS = 30_000;
+/** How long a request body may take to arrive, in milliseconds. */
+export const BODY_TIMEOUT_MS = 10_000;
+
+/** How long a payment call may take before it is abandoned, in milliseconds. */
+export const UPSTREAM_TIMEOUT_MS = 10_000;
 
 /**
  * Version reported by /healthz.

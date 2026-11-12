@@ -88,6 +88,7 @@ test("the documented set is exactly the strings a client may branch on", async (
     "payload_too_large",
     "payment_required",
     "read_failed",
+    "read_timeout",
     "unknown_entitlement",
     "unknown_plan",
     "upstream_failed",

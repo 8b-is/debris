@@ -154,6 +154,7 @@ these and on nothing else:
 | 400 | `bad_payload` | signature valid but the body is not JSON |
 | 400 | `payload_too_large` | body over 64 KiB |
 | 400 | `read_failed` | the request body errored mid-read |
+| 400 | `read_timeout` | the body did not arrive within 10 s |
 | 404 | `not_found` | unknown route |
 | 402 | `payment_required` | bundle asked for a record that is free or past due |
 | 404 | `unknown_entitlement` | no ledger entry for that email |
@@ -216,7 +217,7 @@ The ADRs are accepted. The landing and the server are built to
 
 What is built: the entitlement ledger, the tier table, the addon manifest, the
 configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
-HMAC-verified webhooks that fail closed. 68 tests, offline.
+HMAC-verified webhooks that fail closed. 70 tests, offline.
 
 What is not built: **the credential broker** — nothing in this service stores a
 debrid token yet. The bundle is the shape it will hand out, and the bundle

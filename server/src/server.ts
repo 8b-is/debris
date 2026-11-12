@@ -8,7 +8,7 @@
 
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
-import { DEFAULT_PORT, MAX_BODY_BYTES, VERSION } from "./consts.ts";
+import { BODY_TIMEOUT_MS, DEFAULT_PORT, MAX_BODY_BYTES, VERSION } from "./consts.ts";
 import { createBundle } from "./manifest.ts";
 import { PLAN_LIST } from "./plans.ts";
 import { EntitlementStore, normalizeEmail } from "./store.ts";
@@ -39,7 +39,10 @@ function json(res: ServerResponse, status: number, payload: unknown): void {
 }
 
 /** Read the whole request body, refusing anything over the cap. */
-function readBody(req: IncomingMessage): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+function readBody(
+  req: IncomingMessage,
+  onTimeout?: () => void,
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -48,8 +51,19 @@ function readBody(req: IncomingMessage): Promise<{ ok: true; text: string } | { 
     const finish = (value: { ok: true; text: string } | { ok: false; error: string }): void => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
       resolve(value);
     };
+
+    // A client that opens a body and never sends it would otherwise hold the
+    // socket forever, one slow request at a time. Destroying the request first
+    // would kill the socket before the 400 can be written, so the handler is
+    // told to answer and closes afterwards.
+    const timer = setTimeout(() => {
+      finish({ ok: false, error: "read_timeout" });
+      onTimeout?.();
+    }, BODY_TIMEOUT_MS);
+    timer.unref?.();
 
     req.on("data", (chunk: Buffer) => {
       if (settled) return;
@@ -66,10 +80,11 @@ function readBody(req: IncomingMessage): Promise<{ ok: true; text: string } | { 
   });
 }
 
-function readJsonBody(req: IncomingMessage): Promise<
-  { ok: true; value: Record<string, unknown> } | { ok: false; error: string }
-> {
-  return readBody(req).then((result) => {
+function readJsonBody(
+  req: IncomingMessage,
+  onTimeout?: () => void,
+): Promise<{ ok: true; value: Record<string, unknown> } | { ok: false; error: string }> {
+  return readBody(req, onTimeout).then((result) => {
     if (!result.ok) return result;
     if (!result.text.trim()) return { ok: true as const, value: {} };
     try {
@@ -136,7 +151,11 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
       }
 
       if (method === "POST" && url.pathname === "/api/checkout") {
-        const body = await readJsonBody(req);
+        let timedOut = false;
+        const body = await readJsonBody(req, () => {
+          timedOut = true;
+        });
+        if (timedOut) res.on("finish", () => req.destroy());
         if (!body.ok) {
           json(res, 400, { error: body.error });
           return;
