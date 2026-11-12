@@ -242,3 +242,36 @@ test("a claim survives a new EventLog on the same file", async () => {
   assert.equal(b.claim("evt_persist"), false, "the claim must be on disk");
   rmSync(dir2, { recursive: true, force: true });
 });
+
+test("interleaved claims and releases persist the survivors, not a torn file", async () => {
+  const dir2 = mkdtempSync(join(tmpdir(), "claimrace-"));
+  const file = join(dir2, "events.json");
+  const log = new EventLog(file);
+  // All in one tick: the writes must serialise or the file tears.
+  for (let i = 0; i < 20; i += 1) {
+    log.claim(`e${i}`);
+    if (i % 2) log.release(`e${i}`);
+  }
+  await new Promise((r) => setTimeout(r, 400));
+
+  const ids = JSON.parse(readFileSync(file, "utf8")) as string[];
+  assert.equal(ids.length, 10, "only the unreleased claims survive");
+  assert.deepEqual(ids, ["e0", "e2", "e4", "e6", "e8", "e10", "e12", "e14", "e16", "e18"]);
+  rmSync(dir2, { recursive: true, force: true });
+});
+
+test("an unwritable event log does not crash the process", async () => {
+  // /dev/null is not a directory, so mkdir fails. The claim must still return
+  // rather than surfacing an unhandled rejection that would kill the service.
+  const log = new EventLog("/dev/null/nope/events.json");
+  const errors: unknown[] = [];
+  const realError = console.error;
+  console.error = (...args: unknown[]): void => { errors.push(args[0]); };
+  try {
+    assert.equal(log.claim("evt_unwritable"), true);
+    await new Promise((r) => setTimeout(r, 300));
+  } finally {
+    console.error = realError;
+  }
+  assert.ok(errors.length > 0, "the failure must be reported, not swallowed silently");
+});

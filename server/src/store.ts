@@ -88,6 +88,7 @@ export interface StoreOptions {
 export class EventLog {
   #seen = new Set<string>();
   #file: string;
+  #queue: Promise<void> = Promise.resolve();
 
   constructor(file: string) {
     this.#file = file;
@@ -105,14 +106,24 @@ export class EventLog {
     if (!id) return true; // no id, nothing to dedupe on
     if (this.#seen.has(id)) return false;
     this.#seen.add(id);
-    void this.#persist();
+    // Not awaited: the caller has a request to finish. A failure must not surface
+    // as an unhandled rejection, which under Node's default terminates the
+    // process — a full disk would take the whole service down rather than only
+    // losing idempotency.
+    this.#persist().catch((err: unknown) => {
+      console.error("event log: persist failed", err);
+    });
     return true;
   }
 
   /** Give an id back, for a claim whose work failed. */
   release(id: string): void {
     if (!id) return;
-    if (this.#seen.delete(id)) void this.#persist();
+    if (this.#seen.delete(id)) {
+      this.#persist().catch((err: unknown) => {
+        console.error("event log: persist failed", err);
+      });
+    }
   }
 
   get size(): number {
@@ -120,6 +131,13 @@ export class EventLog {
   }
 
   async #persist(): Promise<void> {
+    // Serialised: a claim, release, and claim in the same tick would otherwise
+    // write the same tmp path concurrently.
+    this.#queue = this.#queue.then(() => this.#write());
+    return this.#queue;
+  }
+
+  async #write(): Promise<void> {
     const dir = dirname(this.#file);
     mkdirSync(dir, { recursive: true });
     const ids = [...this.#seen];
