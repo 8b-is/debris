@@ -193,16 +193,18 @@ a sentence, not a property.
 AGENTS.md                     the rules, for agents and for reviewers
 plans/SPEC.md                 the build contract both lanes implement against
 docs/ELI5.md                  what it is, for a ten-year-old
-docs/adr/0001..0004           broker-not-host, integer cents, fail-closed webhook,
-                             static standalone landing
+docs/adr/0001..0005           broker-not-host, integer cents, fail-closed webhook,
+                             static standalone landing, unauthenticated-until-deployed
 scripts/verify.sh             syntax check + full suite
 server/src/consts.ts          the canonical constants: body cap, port, tolerance, mode
 server/src/plans.ts           the tier table — the only place a price lives
 server/src/store.ts           entitlement ledger, atomic writes
 server/src/stripe.ts          the checkout seam, injectable transport
+server/src/manifest.ts        the addon catalogue and the device bundle
+server/src/audit.ts           one-line audit trail per entitlement change
 server/src/webhook.ts         HMAC verification and event dispatch
-server/src/server.ts          the five routes
-server/test/                  offline end-to-end route tests
+server/src/server.ts          the five routes, plus graceful drain
+server/test/                  87 offline tests, including README and landing parity
 landing/index.html            the page
 landing/landing.css           layout and components; defines no colour of its own
 landing/tokens.css            constellation ink, copied with provenance
@@ -218,8 +220,9 @@ The ADRs are accepted. The landing and the server are built to
 
 What is built: the entitlement ledger, the tier table, the addon manifest, the
 configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
-HMAC-verified webhooks that fail closed, and an audit line for every
-entitlement change. 87 tests, offline.
+HMAC-verified webhooks that fail closed, an audit line for every entitlement change,
+and a restart that drains in-flight grants instead of dropping them. 87 tests,
+offline.
 
 **Seats are advertised but not enforced.** `seats` is stored and served, and nothing
 counts devices against it, because no device has an identity. A household customer
@@ -242,6 +245,18 @@ debrid token, and a deployed instance. Those are operator steps, not code.
 The three things this service will be judged on, in order: **the webhook does not
 fail open**, **a price is never a float**, and **the landing makes no request it
 does not need**.
+
+---
+
+## where it lives
+
+| Forge | URL | State |
+|---|---|---|
+| GitHub | <https://github.com/8b-is/debris> | live |
+| Codeberg | <https://codeberg.org/8b-is/debris> | live |
+
+Both carry the same `main`. Push to `origin`, then to `codeberg`; neither is
+authoritative over the other.
 
 ---
 
