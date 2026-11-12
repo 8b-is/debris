@@ -47,6 +47,10 @@ node server/src/server.ts    # serves on PORT, default 8787
 - **No media bytes, ever.** This is the service's whole legal posture. Do not add a
   transcode path, a relay, or a cache of anything larger than a configuration
   document.
+- **`cached_only` and `forced_filters` are requests, not enforcement.** The server
+  cannot make a third-party player honour a filter. The docs say "asks for" and
+  "prefers"; do not upgrade that to "forces" without a component in this repo that
+  actually filters, and do not imply the service can police a device it does not run on.
 - **A device has one secret, stored hashed.** `devices.ts` keeps `sha256(secret)` and
   never the secret. A registry file must not be enough to impersonate a device, which
   is the reason a token exists instead of trusting an email.

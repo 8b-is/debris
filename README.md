@@ -39,7 +39,7 @@ that will not start. That dependency is named in
 | tier | EUR / month | seats | what it adds |
 |---|---|---|---|
 | `free` | 0 | 1 | no configuration bundle, no subtitles |
-| `family` | 490 | 5 | configuration bundle, cached-only streams, HU+EN subtitles |
+| `family` | 490 | 5 | configuration bundle, cached-only preferred, HU+EN subtitles |
 | `household` | 990 | 12 | everything in family, YouTube addon |
 | `patron` | 1900 | 24 | household, 24 seats |
 
@@ -59,9 +59,10 @@ an annualised saving.
    the credential broker lands, the token goes into debris once, server-side, and
    never reaches a device. Until then the token stays in the client, which is the
    arrangement this service exists to replace.
-2. **One manifest.** The allowed addons, the forced filters (`[8B+]` / `[RD+]`
-   cached-only, so no P2P traffic ever reaches a family device), the pinned
-   catalogues, the subtitle languages. Edited in one place, applied everywhere.
+2. **One manifest.** The allowed addons, the preferred filters (`[8B+]` / `[RD+]`
+   cached-only — the bundle asks for cached streams and the client is expected to
+   honour it), the pinned catalogues, the subtitle languages. Edited in one place,
+   applied everywhere.
 3. **One bundle per device.** A device asks `/api/bundle` with its email, receives
    a configuration bundle that expires in an hour, and is done. Nine devices, one
    manifest, no per-device fiddling.
@@ -76,8 +77,10 @@ Supported clients: Stremio on macOS, Windows, Linux, Android, Android TV, iOS
 This is the part worth reading twice.
 
 - **No media hosting.** Not a byte of media is stored here.
-- **No P2P.** The manifest forces cached-only streams, so no family device is ever
-  a peer.
+- **No P2P by default.** The bundle asks for cached-only streams. Whether a device
+  honours that is up to the client, which is not code in this repo: debris can state
+  the rule but cannot enforce it on a player it does not control. A client that
+  ignores `cached_only` is not a supported client.
 - **No ads.** There is nothing to advertise against; we are not in the attention
   business.
 - **No tracking.** The landing page makes no network request other than the
