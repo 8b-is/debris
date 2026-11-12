@@ -155,10 +155,12 @@ these and on nothing else:
 | 400 | `payload_too_large` | body over 64 KiB |
 | 400 | `read_failed` | the request body errored mid-read |
 | 400 | `read_timeout` | the body did not arrive within 10 s |
+| 400 | `device_required` | a device revoke asked without an id or a secret |
 | 401 | `invalid_device_secret` | a device secret was offered and did not match that email |
 | 402 | `payment_required` | bundle asked for a record that is free, lapsed, or past due |
 | 403 | `seat_limit_reached` | every seat is taken and the caller is not a known device |
 | 404 | `not_found` | unknown route |
+| 404 | `unknown_device` | no device with that id, or the secret does not match |
 | 404 | `unknown_entitlement` | no ledger entry for that email |
 | 409 | `already_subscribed` | checkout asked for an email whose subscription is active |
 | 500 | `internal` | anything unhandled |
@@ -224,7 +226,7 @@ The ADRs are accepted. The landing and the server are built to
 What is built: the entitlement ledger, the tier table, the addon manifest, the
 configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
 HMAC-verified webhooks that fail closed, an audit line for every entitlement change,
-and a restart that drains in-flight grants instead of dropping them. 104 tests,
+and a restart that drains in-flight grants instead of dropping them. 107 tests,
 offline.
 
 **Seats are now enforced, by device.** A device is one physical thing that asks for a
@@ -232,6 +234,14 @@ bundle. The first request registers it and receives a secret once; later request
 present it, and a reconnecting device does not cost a second seat. A household cap of
 twelve is refused at thirteen. The registry persists, so a restart does not burn a
 seat per device.
+
+**Seats can be freed.** `DELETE /api/devices?id=` with that device's secret releases
+its seat, so a lost phone does not hold one forever. It is audited like every other
+change.
+
+**Two taps in the same second make one session.** The active-subscription check and
+the Stripe call are not atomic, so a per-email in-flight guard turns the second into a
+409 rather than a second charge.
 
 **`GET /api/entitlement` is still unauthenticated.** It takes an email and returns a
 record. `/api/bundle` now requires a device secret, but this route does not, so

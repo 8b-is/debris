@@ -467,3 +467,85 @@ test("a full house refuses a new device with seat_limit_reached", async () => {
     await inst.close();
   }
 });
+
+test("a device can free its own seat, and only its own", async () => {
+  const store = new EntitlementStore({ file: join(dir, "revoke.json") });
+  await store.put({ email: "cap@test", plan: "household", seats: 2, status: "active", valid_until: null });
+  const reg = new DeviceRegistry();
+  const inst = await startServer(0, {
+    store,
+    stripe: { fetch: fakeStripeFetch, secret: "sk" },
+    devices: reg,
+  });
+  try {
+    const first = await fetch(`${inst.url}/api/bundle?email=cap@test&device=TV`);
+    const { device_id, device_secret } = await first.json();
+    const second = await fetch(`${inst.url}/api/bundle?email=cap@test&device=Phone`);
+    assert.equal(second.status, 200);
+    assert.equal(second.status, 200, "two seats fit");
+
+    // A third does not.
+    const third = await fetch(`${inst.url}/api/bundle?email=cap@test&device=Tablet`);
+    assert.equal(third.status, 403);
+
+    // Revoke the first: a wrong secret is refused, the right one frees the seat.
+    const wrong = await fetch(`${inst.url}/api/devices?id=${device_id}`, {
+      method: "DELETE",
+      headers: { authorization: "Bearer not-the-secret" },
+    });
+    assert.equal(wrong.status, 404);
+
+    const ok = await fetch(`${inst.url}/api/devices?id=${device_id}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${device_secret}` },
+    });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(await ok.json(), { revoked: true, id: device_id });
+
+    // The seat is free now.
+    const fourth = await fetch(`${inst.url}/api/bundle?email=cap@test&device=Tablet`);
+    assert.equal(fourth.status, 200, "the freed seat must be usable");
+  } finally {
+    await inst.close();
+  }
+});
+
+test("a revoke without an id or secret is refused", async () => {
+  const inst = await startServer(0, {
+    store: new EntitlementStore({ file: join(dir, "rev1.json") }),
+    stripe: { fetch: fakeStripeFetch, secret: "sk" },
+    devices: new DeviceRegistry(),
+  });
+  try {
+    const res = await fetch(`${inst.url}/api/devices`, { method: "DELETE" });
+    assert.equal(res.status, 400);
+    assert.deepEqual(await res.json(), { error: "device_required" });
+  } finally {
+    await inst.close();
+  }
+});
+
+test("two simultaneous checkouts create only one session", async () => {
+  const inst = await startServer(0, {
+    store: new EntitlementStore({ file: join(dir, "race.json") }),
+    stripe: {
+      fetch: async () => {
+        await new Promise((r) => setTimeout(r, 60));
+        return { ok: true, status: 200, json: async () => ({ id: "cs_race", url: "https://x.test/c" }) };
+      },
+      secret: "sk",
+    },
+    devices: new DeviceRegistry(),
+  });
+  try {
+    const body = JSON.stringify({ plan: "family", email: "race@test" });
+    const [a, b] = await Promise.all([
+      fetch(`${inst.url}/api/checkout`, { method: "POST", headers: { "content-type": "application/json" }, body }),
+      fetch(`${inst.url}/api/checkout`, { method: "POST", headers: { "content-type": "application/json" }, body }),
+    ]);
+    const statuses = [a.status, b.status].sort();
+    assert.deepEqual(statuses, [200, 409], "one session, one refusal");
+  } finally {
+    await inst.close();
+  }
+});

@@ -10,7 +10,7 @@ import { createServer as createHttpServer, type IncomingMessage, type Server, ty
 
 import { audit } from "./audit.ts";
 import { BODY_TIMEOUT_MS, DEFAULT_PORT, MAX_BODY_BYTES, SHUTDOWN_GRACE_MS, VERSION } from "./consts.ts";
-import { DeviceRegistry, loadDevices } from "./devices.ts";
+import { DeviceRegistry, loadDevices, secretMatches } from "./devices.ts";
 import { createBundle } from "./manifest.ts";
 import { PLAN_LIST } from "./plans.ts";
 import { EntitlementStore, isActiveNow, normalizeEmail } from "./store.ts";
@@ -22,6 +22,15 @@ export interface ServerDeps {
   stripe?: StripeDeps;
   devices?: DeviceRegistry;
 }
+
+/**
+ * Emails with a checkout in flight.
+ *
+ * The active-subscription check and the Stripe call are not atomic, so two taps
+ * in the same second both pass the check and both create a session. Keying on the
+ * email serialises them without a lock file.
+ */
+const inFlightCheckout = new Map<string, boolean>();
 
 export interface DebrisServer {
   server: Server;
@@ -218,6 +227,15 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
           return;
         }
 
+        // Two taps in the same second both pass the check above and both reach
+        // Stripe. Serialising per email turns that into one session and one 409.
+        const pending = inFlightCheckout.get(normalizeEmail(email));
+        if (pending) {
+          json(res, 409, { error: "already_subscribed" });
+          return;
+        }
+
+        inFlightCheckout.set(normalizeEmail(email), true);
         try {
           const result = await createCheckoutSession(stripe, {
             plan: body.value.plan,
@@ -235,6 +253,8 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
           }
           console.error("checkout: error", err);
           json(res, 502, { error: "upstream_failed" });
+        } finally {
+          inFlightCheckout.delete(normalizeEmail(email));
         }
         return;
       }
@@ -268,6 +288,32 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
           return;
         }
         json(res, 200, record);
+        return;
+      }
+
+      // Free a seat. Without this a lost phone holds one forever and the family
+      // cap is a leak: the only way to recover would be to delete the ledger by
+      // hand. The device proves it owns the seat by presenting that device's
+      // secret, which is the only proof the registry has.
+      if (method === "DELETE" && url.pathname === "/api/devices") {
+        const id = url.searchParams.get("id") ?? "";
+        const secret = bearerToken(req.headers.authorization);
+        if (!id || !secret) {
+          json(res, 400, { error: "device_required" });
+          return;
+        }
+        const device = devices.get(id);
+        if (!device || !secretMatches(secret, device.secret_hash)) {
+          json(res, 404, { error: "unknown_device" });
+          return;
+        }
+        const revoked = devices.revoke(id);
+        if (!revoked) {
+          json(res, 404, { error: "unknown_device" });
+          return;
+        }
+        audit({ event: "device.revoked", email: device.email });
+        json(res, 200, { revoked: true, id });
         return;
       }
 
