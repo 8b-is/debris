@@ -330,6 +330,7 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
           Math.floor(Date.now() / 1000),
           {
             claimEvent: (id) => events.claim(id),
+            releaseEvent: (id) => events.release(id),
             onSubscriptionEnded: (email) => {
               const released = devices.releaseAllForEmail(email);
               for (const id of released) {

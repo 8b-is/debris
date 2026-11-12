@@ -358,3 +358,53 @@ test("a cancel still ends the period, even through the renewal path", async () =
   }, now + 60);
   assert.equal(store.get("cancel2@pay.test")?.valid_until, null);
 });
+
+test("a failed grant releases the claim so a retry still works", async () => {
+  const { EventLog } = await import("../src/store.ts");
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = mkdtempSync(join(tmpdir(), "retry-"));
+  const events = new EventLog(join(dir, "events.json"));
+
+  // Fails the first write, succeeds after: a transient disk error.
+  const real = new EntitlementStore({ file: join(dir, "e.json") });
+  let failNext = true;
+  const flaky = {
+    get: (e: string) => real.get(e),
+    put: async (r: any) => {
+      if (failNext) { failNext = false; throw new Error("transient"); }
+      return real.put(r);
+    },
+  } as unknown as EntitlementStore;
+
+  const deps = {
+    claimEvent: (id: string) => events.claim(id),
+    releaseEvent: (id: string) => events.release(id),
+  };
+  const now = Math.floor(Date.now() / 1000);
+  const event = {
+    id: "evt_retry_1",
+    type: "checkout.session.completed",
+    created: now,
+    data: { object: { metadata: { plan: "family" as const, email: "retry@pay.test" } } },
+  };
+
+  // Through handleWebhook, where the claim and its release live.
+  const body = JSON.stringify(event);
+  const ts = now;
+  const sig = createHmac("sha256", SECRET).update(`${ts}.${body}`, "utf8").digest("hex");
+  const header = `t=${ts},v1=${sig}`;
+
+  await assert.rejects(
+    () => handleWebhook(flaky, body, header, SECRET, ts, deps),
+    /transient/,
+  );
+  assert.equal(events.size, 0, "the claim must be released on failure");
+
+  // The retry, as Stripe would send it, now gets through.
+  const retry = await handleWebhook(flaky, body, header, SECRET, ts, deps);
+  assert.equal(retry.ok, true);
+  assert.equal(real.get("retry@pay.test")?.plan, "family", "the customer must get their plan");
+  rmSync(dir, { recursive: true, force: true });
+});

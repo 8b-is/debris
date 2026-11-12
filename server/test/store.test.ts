@@ -6,6 +6,7 @@ import { afterEach, beforeEach, test } from "node:test";
 
 import {
   EntitlementStore,
+  EventLog,
   freeEntitlement,
   isActiveNow,
   isExpired,
@@ -211,4 +212,33 @@ test("an unparseable expiry is treated as expired, not as forever", () => {
   };
   assert.equal(isExpired(broken), true);
   assert.equal(isActiveNow(broken), false);
+});
+
+test("a released claim can be claimed again", () => {
+  const dir2 = mkdtempSync(join(tmpdir(), "claim-"));
+  const log = new EventLog(join(dir2, "events.json"));
+  assert.equal(log.claim("evt_a"), true);
+  assert.equal(log.claim("evt_a"), false, "a replay is refused");
+  log.release("evt_a");
+  assert.equal(log.claim("evt_a"), true, "a released claim is claimable again");
+  rmSync(dir2, { recursive: true, force: true });
+});
+
+test("an empty id never dedupes, since there is nothing to key on", () => {
+  const dir2 = mkdtempSync(join(tmpdir(), "claim2-"));
+  const log = new EventLog(join(dir2, "events.json"));
+  assert.equal(log.claim(""), true);
+  assert.equal(log.claim(""), true);
+  rmSync(dir2, { recursive: true, force: true });
+});
+
+test("a claim survives a new EventLog on the same file", async () => {
+  const dir2 = mkdtempSync(join(tmpdir(), "claim3-"));
+  const file = join(dir2, "events.json");
+  const a = new EventLog(file);
+  a.claim("evt_persist");
+  await new Promise((r) => setTimeout(r, 200));
+  const b = new EventLog(file);
+  assert.equal(b.claim("evt_persist"), false, "the claim must be on disk");
+  rmSync(dir2, { recursive: true, force: true });
 });

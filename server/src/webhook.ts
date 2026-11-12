@@ -138,6 +138,8 @@ export interface DispatchDeps {
    * enrolment code and invalidates the one the family was given.
    */
   claimEvent?: (id: string) => boolean;
+  /** Give a claimed id back when its work failed, so a retry is not dropped. */
+  releaseEvent?: (id: string) => void;
   /**
    * Called when a subscription ends, so the caller can release that family's
    * devices.
@@ -158,8 +160,14 @@ export async function dispatchEvent(
   const type = typeof event.type === "string" ? event.type : "";
   const created = typeof event.created === "number" ? event.created : nowSeconds;
 
-  // Idempotency. A replay is acknowledged and dropped, so a grant cannot run twice.
-  if (event.id && deps.claimEvent && !deps.claimEvent(event.id)) {
+  // Idempotency, with the claim released on failure.
+  //
+  // Marking an event seen before applying it loses money: if the grant throws, the
+  // event is already recorded, so Stripe's retry is acknowledged and dropped and the
+  // customer pays for nothing. The id is claimed first so a genuine replay is
+  // dropped, and released if the work fails so a retry can still get through.
+  const claimed = event.id && deps.claimEvent ? deps.claimEvent(event.id) : false;
+  if (event.id && deps.claimEvent && !claimed) {
     return { ok: true, received: true, ignored: true, event: type };
   }
   const obj = event.data?.object ?? {};
@@ -298,5 +306,11 @@ export async function handleWebhook(
     return { ok: false, error: "bad_payload" };
   }
 
-  return dispatchEvent(store, event, nowSeconds, deps);
+  try {
+    return await dispatchEvent(store, event, nowSeconds, deps);
+  } catch (err) {
+    // Give the id back so Stripe's retry is not swallowed.
+    if (event.id && deps.releaseEvent) deps.releaseEvent(event.id);
+    throw err;
+  }
 }

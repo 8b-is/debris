@@ -109,6 +109,12 @@ export class EventLog {
     return true;
   }
 
+  /** Give an id back, for a claim whose work failed. */
+  release(id: string): void {
+    if (!id) return;
+    if (this.#seen.delete(id)) void this.#persist();
+  }
+
   get size(): number {
     return this.#seen.size;
   }
