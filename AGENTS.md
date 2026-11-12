@@ -1,0 +1,80 @@
+# AGENTS.md — `8b-is-debris`
+
+A cache broker and an entitlement ledger. It holds a debrid credential, a curated
+addon manifest, and a list of who has paid. It does not hold media, relay bytes, or
+run a proxy data path.
+
+Zero runtime dependencies. Node 26 runs the TypeScript sources directly through
+type stripping — there is no build step, no bundler, and no `node_modules`.
+
+```bash
+cd ~/workspace/peterlodri-sec/8b-is-debris
+scripts/verify.sh            # syntax check every source, then the whole suite
+node --test server/test/     # 64 tests, offline, no network
+node server/src/server.ts    # serves on PORT, default 8787
+```
+
+## Rules
+
+- **Money is integer cents.** A price is `490`, never `4.90`. The only place a
+  currency symbol exists is `formatPrice` in `landing/app.js`, and the only place a
+  price is declared is `server/src/plans.ts`. A float near money is a bug even when
+  the tests pass. See `docs/adr/0002`.
+- **The webhook fails closed.** No secret, no entry. There is no development bypass
+  and there must never be one; a service that accepts unsigned events is a free
+  service. Seed state by writing `server/data/entitlements.json` directly. See
+  `docs/adr/0003`.
+- **Stripe sits behind one seam.** `createCheckoutSession` takes its transport as a
+  dependency. Do not import `fetch` at the call site, and do not add the Stripe SDK:
+  the zero-dependency property is worth more than the convenience.
+- **Errors are the API's own strings.** The full set is the table in
+  `README.md` §"the API". The landing renders them verbatim. Do not invent friendlier
+  copy in the client, and do not rename or add an error string without updating the
+  README table and `server/test/readme-contract.test.ts`, which fails on drift in
+  either direction.
+- **The price table exists twice on purpose.** `landing/app.js` holds a copy so the
+  page can be a static file with no loading state.
+  `server/test/landing-parity.test.ts` compares the two and fails on drift. If you
+  change a price, change both and keep that test green — without it the duplication
+  is a defect, not a decision.
+- **The landing makes no request except `POST /api/checkout`.** No CDN, no external
+  font, no analytics, no tag manager. `app.js` is a classic deferred script, not an
+  ES module, because a module is blocked over `file://` and the page must open off
+  the filesystem.
+- **Name only what is checked.** `README.md` is the contract. If it says something is
+  absent — the proxy data path, media storage, a database, an agent surface — it
+  stays absent until it has acceptance tests of its own.
+- **No media bytes, ever.** This is the service's whole legal posture. Do not add a
+  transcode path, a relay, or a cache of anything larger than a configuration
+  document.
+- **A bundle never carries the credential.** `createBundle` has no token field, and
+  `manifest.test.ts` asserts the serialised bundle contains no `token`, `credential`,
+  `secret`, `api_key`, or `password`. Do not add one "for convenience"; the credential
+  broker is the piece that stores it server-side, and it is not built yet.
+
+## Layout
+
+```
+server/src/consts.ts      body cap, port, webhook tolerance, ledger mode, version
+server/src/plans.ts       the tier table — the only place a price is declared
+server/src/manifest.ts    the addon catalogue and the device bundle
+server/src/store.ts       entitlement ledger, atomic tmp+rename writes
+server/src/stripe.ts      the checkout seam, injectable transport
+server/src/webhook.ts     HMAC-SHA256 verification and event dispatch
+server/src/server.ts      the five routes
+server/test/              64 offline tests, including landing and README parity
+landing/                  static page: index.html, landing.css, tokens.css, app.js
+docs/adr/                 the four decisions, each with what would change it
+docs/ELI5.md              what it is, for a ten-year-old
+plans/SPEC.md             the build contract
+```
+
+## Verifying a change
+
+`scripts/verify.sh` is the whole gate. If it exits 0 the change is safe to commit.
+A change that only edits the landing still needs the parity test, which is why the
+script runs the full suite rather than a subset.
+
+## Licence
+
+AGPL-3.0-only, matching the workspace it lives in. `LICENSE` is the verbatim text.

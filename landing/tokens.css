@@ -1,0 +1,59 @@
+/*
+ * tokens.css — the constellation ink, as CSS custom properties.
+ *
+ * Source: 8b-is/design/DESIGN.md and 8b-is/design/tokens.json.
+ *
+ * These values are copied, not imported. The landing must stand alone on any
+ * file server, so it deliberately does not reach across repositories for its
+ * palette. If the constellation palette changes, this file changes with it by
+ * hand (docs/adr/0004-static-landing-that-stands-alone.md).
+ */
+
+:root {
+  /* canvas */
+  --bg: #05060a;
+  --panel: #0b0f19;
+  --panel-2: #0e1424;
+  --vignette: #0d1220;
+
+  /* ink */
+  --ink: #cfc9dd;
+  --dim: #7f7c99;
+  --faint: #5b577a;
+
+  /* accents */
+  --mint: #62e6c9;
+  --gold: #e8b05c;
+  --violet: #b48bff;
+  --cyan: #00f0ff;
+  --pink: #ff4d9d;
+
+  /* lines */
+  --line: rgba(170, 150, 255, 0.18);
+  --line-strong: rgba(170, 150, 255, 0.28);
+
+  /* type */
+  --mono: ui-monospace, "SF Mono", Menlo, "JetBrains Mono", monospace;
+  --serif: Georgia, "Times New Roman", serif;
+
+  /* shape */
+  --radius-sm: 10px;
+  --radius-card: 14px;
+  --radius-pill: 999px;
+
+  /* space */
+  --max-width: 1376px;
+  --pad: 64px;
+  --section-y: 84px;
+
+  /* motion */
+  --fast: 150ms;
+  --ambient: 22s;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --pad: 24px;
+    --section-y: 56px;
+  }
+}

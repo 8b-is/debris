@@ -1,0 +1,64 @@
+name: debris CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Syntax and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Syntax check every source
+        run: |
+          for f in server/src/*.ts landing/app.js; do
+            node --check "$f"
+          done
+
+      - name: Test suite
+        run: node --test server/test/
+
+  landing:
+    name: Landing has no external requests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: The landing loads nothing external
+        run: |
+          # A namespace identifier (xmlns) is not a request. Only attributes and
+          # CSS that actually fetch are: src, href, url(), @import, and fetch().
+          if grep -nE '(src|href)="https?://|url\(["'"'"']?https?://|@import[[:space:]]+["'"'"']?https?://|fetch\(["'"'"']https?://' \
+              landing/index.html landing/landing.css landing/tokens.css landing/app.js; then
+            echo "::error::the landing fetches from an external origin"
+            exit 1
+          fi
+          echo "no external fetches"
+
+      - name: Exactly one h1
+        run: |
+          count=$(grep -c "<h1" landing/index.html)
+          if [ "$count" != "1" ]; then
+            echo "::error::expected exactly one h1, found $count"
+            exit 1
+          fi
+          echo "one h1"

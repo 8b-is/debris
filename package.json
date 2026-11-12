@@ -1,0 +1,17 @@
+{
+  "name": "8b-is-debris-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cache broker and entitlement ledger for a family streaming setup.",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "start": "node server/src/server.ts",
+    "test": "node --test server/test/"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "engines": {
+    "node": ">=24"
+  }
+}

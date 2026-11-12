@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>debris — a cache broker for one family's streaming setup</title>
+<meta name="description" content="debris curates one addon manifest, brokers a short-lived configuration bundle to every device, and keeps the family entitlement ledger. Not a media host, not a proxy.">
+<meta name="robots" content="index, follow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305060a'/%3E%3Ctext x='16' y='23' font-family='monospace' font-size='20' fill='%23e8b05c' text-anchor='middle'%3E.%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="landing.css">
+</head>
+<body>
+<a class="skip" href="#main">skip to content</a>
+
+<header class="site-head">
+  <div class="wrap site-head__inner">
+    <p class="mark"><span class="mark__8b">8b</span><span class="mark__dot">.</span><span class="mark__rest">debris</span></p>
+    <p class="kicker">cache broker · entitlement ledger · no media hosted</p>
+  </div>
+</header>
+
+<main id="main">
+  <section class="wrap hero" aria-labelledby="hero-title">
+    <h1 id="hero-title" class="hero__title">One streaming setup, configured once, held for the whole family.</h1>
+    <p class="hero__lede">
+      debris curates which addons are allowed and which filters are forced, brokers a
+      short-lived configuration bundle to each device, and keeps one ledger of who has paid
+      and how many device seats that buys. The bytes stay in the cache. We hold the
+      configuration.
+    </p>
+    <p class="hero__aside">
+      The honest trade: we depend on a third party for the media and cannot fix a stream that
+      will not start. That dependency is named, not hidden.
+    </p>
+  </section>
+
+  <section class="wrap section" aria-labelledby="does-title">
+    <h2 id="does-title" class="kicker">what it does</h2>
+    <div class="grid grid--3">
+      <article class="card">
+        <h3 class="card__title">configuration bundle</h3>
+        <p class="card__body">
+          A device asks for its bundle and gets the addons, the filters and the subtitle
+          languages it is allowed. Short-lived, per device, and it never carries a credential.
+        </p>
+        <p class="card__sig" aria-hidden="true">01</p>
+      </article>
+      <article class="card">
+        <h3 class="card__title">curated addon manifest</h3>
+        <p class="card__body">
+          Which addons are permitted, which filters are forced, which catalogues are pinned.
+          The manifest is the product; it is data, not a release.
+        </p>
+        <p class="card__sig" aria-hidden="true">02</p>
+      </article>
+      <article class="card">
+        <h3 class="card__title">entitlement ledger</h3>
+        <p class="card__body">
+          Who has paid, at what tier, and how many seats that allows. A JSON file with atomic
+          writes. Correct size of solution for a family.
+        </p>
+        <p class="card__sig" aria-hidden="true">03</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="wrap section" aria-labelledby="tiers-title">
+    <h2 id="tiers-title" class="kicker">the tiers</h2>
+
+    <form class="checkout-form" data-checkout-form novalidate>
+      <label class="checkout-form__label" for="email">family email</label>
+      <input
+        class="checkout-form__input"
+        id="email"
+        name="email"
+        type="email"
+        inputmode="email"
+        autocomplete="email"
+        placeholder="you@example.com"
+        required
+      >
+      <p class="checkout-form__hint">used once, to create the subscription. no list, no marketing.</p>
+      <p class="checkout-form__alert" data-checkout-alert role="alert" hidden></p>
+    </form>
+
+    <div class="grid grid--3" data-tiers></div>
+
+    <button class="patron" type="button" data-tier-patron>
+      patron — €19.00/mo, 24 seats, priority relay and two guest passes
+    </button>
+
+    <p class="hedge">billed monthly, cancel any time. every figure is a list price for one month.</p>
+  </section>
+
+  <section class="wrap section" aria-labelledby="how-title">
+    <h2 id="how-title" class="kicker">how it works</h2>
+    <ol class="steps">
+      <li class="step">
+        <span class="step__n" aria-hidden="true">1</span>
+        <h3 class="step__title">one debrid account</h3>
+        <p class="step__body">The family holds the account. Storing that credential server-side is the one piece still ahead of the code.</p>
+      </li>
+      <li class="step">
+        <span class="step__n" aria-hidden="true">2</span>
+        <h3 class="step__title">one manifest</h3>
+        <p class="step__body">Allowed addons, forced filters — cached-only, so no peer traffic ever reaches a family device — and pinned catalogues, edited in one place.</p>
+      </li>
+      <li class="step">
+        <span class="step__n" aria-hidden="true">3</span>
+        <h3 class="step__title">one bundle per device</h3>
+        <p class="step__body">A device asks for its bundle and gets one that expires in an hour. Nine devices, one manifest.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="wrap section" aria-labelledby="never-title">
+    <h2 id="never-title" class="kicker">what debris never does</h2>
+    <ul class="never">
+      <li><span class="never__no" aria-hidden="true">no</span> media hosting. not a byte of media is stored here.</li>
+      <li><span class="never__no" aria-hidden="true">no</span> peer traffic. the manifest forces cached-only streams.</li>
+      <li><span class="never__no" aria-hidden="true">no</span> ads. there is nothing to advertise against.</li>
+      <li><span class="never__no" aria-hidden="true">no</span> tracking. this page makes no request other than the checkout post.</li>
+      <li><span class="never__no" aria-hidden="true">no</span> account required to read the docs.</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="wrap site-foot__inner">
+    <p class="mark mark--small"><span class="mark__8b">8b</span><span class="mark__dot">.</span><span class="mark__rest">debris</span></p>
+    <p class="foot__line">fine touch from within. AGPL-3.0-only.</p>
+  </div>
+</footer>
+
+<script src="app.js" defer></script>
+</body>
+</html>
