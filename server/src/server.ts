@@ -8,7 +8,9 @@
 
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
+import { audit } from "./audit.ts";
 import { BODY_TIMEOUT_MS, DEFAULT_PORT, MAX_BODY_BYTES, SHUTDOWN_GRACE_MS, VERSION } from "./consts.ts";
+import { DeviceRegistry, loadDevices } from "./devices.ts";
 import { createBundle } from "./manifest.ts";
 import { PLAN_LIST } from "./plans.ts";
 import { EntitlementStore, isActiveNow, normalizeEmail } from "./store.ts";
@@ -18,13 +20,23 @@ import { handleWebhook } from "./webhook.ts";
 export interface ServerDeps {
   store?: EntitlementStore;
   stripe?: StripeDeps;
+  devices?: DeviceRegistry;
 }
 
 export interface DebrisServer {
   server: Server;
   url: string;
   store: EntitlementStore;
+  devices: DeviceRegistry;
   close: () => Promise<void>;
+}
+
+/** Extract a Bearer token from an Authorization header, or null. */
+function bearerToken(header: string | undefined): string | null {
+  if (typeof header !== "string") return null;
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  const token = match?.[1]?.trim();
+  return token ? token : null;
 }
 
 function json(res: ServerResponse, status: number, payload: unknown): void {
@@ -101,6 +113,7 @@ function readJsonBody(
 
 export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
   const store = deps.store ?? new EntitlementStore();
+  const devices = deps.devices ?? loadDevices();
   const stripe: StripeDeps = deps.stripe ?? {
     fetch: fetch as unknown as StripeDeps["fetch"],
     secret: process.env.STRIPE_SECRET_KEY,
@@ -146,7 +159,41 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
           json(res, 402, { error: "payment_required" });
           return;
         }
-        json(res, 200, bundle);
+
+        // The credential is the device secret: the first caller registers the
+        // device and receives the secret once, and every later caller must
+        // present it. Without that, the seat limit is a number on a pricing page
+        // that nothing counts (docs/adr/0005).
+        const presented = bearerToken(req.headers.authorization);
+        const known = presented ? devices.authenticate(record.email, presented) : null;
+
+        if (!known) {
+          if (presented) {
+            // A secret was offered and rejected. That is an attempt to use
+            // someone else's device, not a first registration.
+            json(res, 401, { error: "invalid_device_secret" });
+            return;
+          }
+          if (devices.count(record.email) >= record.seats) {
+            json(res, 403, { error: "seat_limit_reached" });
+            return;
+          }
+          const name = url.searchParams.get("device") ?? "unnamed device";
+          const issued = devices.issue(record.email, name);
+          if (!issued) {
+            json(res, 500, { error: "internal" });
+            return;
+          }
+          audit({
+            event: "device.registered",
+            email: record.email,
+            plan: record.plan,
+          });
+          json(res, 200, { ...bundle, device_id: issued.device.id, device_secret: issued.secret });
+          return;
+        }
+
+        json(res, 200, { ...bundle, device_id: known.id });
         return;
       }
 
@@ -239,6 +286,7 @@ export function createDebrisServer(deps: ServerDeps = {}): DebrisServer {
     server,
     url: "",
     store,
+    devices,
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));

@@ -63,6 +63,105 @@ export interface StoreOptions {
 }
 
 /**
+ * A JSON file with atomic writes, generic over its shape.
+ *
+ * Entitlements and the device registry both need exactly this: read on boot,
+ * write tmp + fsync + rename, survive a power loss. Rather than a second copy of
+ * the same logic, the mechanics live here and each store supplies its own shape.
+ */
+export class JsonStore<T> {
+  readonly file: string;
+  #value: T;
+  #queue: Promise<void> = Promise.resolve();
+  #empty: T;
+  #encode: (value: T) => string;
+  #decode: (raw: unknown) => T | null;
+
+  constructor(
+    empty: T,
+    encode: (value: T) => string,
+    decode: (raw: unknown) => T | null,
+    options: StoreOptions = {},
+  ) {
+    // No default: a store that cannot say which file it owns could be handed the
+    // ledger's path by accident, and one array would erase every subscription.
+    if (!options.file) throw new Error("a JsonStore must be given its own file");
+    this.file = options.file;
+    this.#empty = empty;
+    this.#value = empty;
+    this.#encode = encode;
+    this.#decode = decode;
+    this.#load();
+  }
+
+  #load(): void {
+    if (!existsSync(this.file)) return;
+    try {
+      const parsed = JSON.parse(readFileSync(this.file, "utf8")) as unknown;
+      const next = this.#decode(parsed);
+      if (next !== null) this.#value = next;
+    } catch {
+      // A corrupt file starts empty rather than crashing, and is left untouched
+      // so an operator can inspect it.
+    }
+  }
+
+  read(): T {
+    return this.#value;
+  }
+
+  /** Replace the value and persist. Queued so concurrent writes cannot interleave. */
+  write(next: T): Promise<void> {
+    const run = async (): Promise<void> => {
+      const previous = this.#value;
+      this.#value = next;
+      try {
+        await this.#flush(next);
+      } catch (err) {
+        this.#value = previous;
+        throw err;
+      }
+    };
+    const result = this.#queue.then(run, run);
+    this.#queue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  async #flush(value: T): Promise<void> {
+    const dir = dirname(this.file);
+    mkdirSync(dir, { recursive: true });
+    const tmp = `${this.file}.${process.pid}.${Date.now()}.tmp`;
+
+    const payload = this.#encode(value);
+    const fd = openSync(tmp, "w", LEDGER_FILE_MODE);
+    try {
+      writeSync(fd, payload);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    renameSync(tmp, this.file);
+
+    let dirFd: number | undefined;
+    try {
+      dirFd = openSync(dir, "r");
+      fsyncSync(dirFd);
+    } catch {
+      // Some platforms refuse to fsync a directory.
+    } finally {
+      if (dirFd !== undefined) closeSync(dirFd);
+    }
+  }
+
+  get empty(): T {
+    return this.#empty;
+  }
+}
+
+/**
  * The store. Reads are served from memory; writes are queued so concurrent
  * callers cannot interleave and the temp-file rename stays atomic.
  */

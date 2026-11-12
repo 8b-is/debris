@@ -10,7 +10,7 @@ type stripping — there is no build step, no bundler, and no `node_modules`.
 ```bash
 cd ~/workspace/peterlodri-sec/8b-is-debris
 scripts/verify.sh            # syntax check every source, then the whole suite
-node --test server/test/     # 87 tests, offline, no network
+node --test server/test/     # 104 tests, offline, no network
 node server/src/server.ts    # serves on PORT, default 8787
 ```
 
@@ -47,10 +47,16 @@ node server/src/server.ts    # serves on PORT, default 8787
 - **No media bytes, ever.** This is the service's whole legal posture. Do not add a
   transcode path, a relay, or a cache of anything larger than a configuration
   document.
-- **The API is unauthenticated, and that is a deployment gate.** `GET /api/entitlement`
-  and `GET /api/bundle` take an email and return a record with no auth check. It is
-  survivable only because the service is not deployed and nothing here holds a
-  credential. **Do not deploy without device tokens.** See `docs/adr/0005`.
+- **A device has one secret, stored hashed.** `devices.ts` keeps `sha256(secret)` and
+  never the secret. A registry file must not be enough to impersonate a device, which
+  is the reason a token exists instead of trusting an email.
+- **A reconnecting device must not cost a seat.** `issue()` returns the known device
+  when the presented secret matches, and only registers a new one otherwise. A TV that
+  reconnects after a reboot is the same TV.
+- **`GET /api/entitlement` is still unauthenticated, and that is a deployment gate.**
+  `/api/bundle` requires a device secret; this route does not, so anyone who knows an
+  email can read that record. It is survivable only because nothing is deployed and
+  nothing here holds a credential. See `docs/adr/0005`.
 - **A bundle never carries the credential.** `createBundle` has no token field, and
   `manifest.test.ts` asserts the serialised bundle contains no `token`, `credential`,
   `secret`, `api_key`, or `password`. Do not add one "for convenience"; the credential
@@ -67,7 +73,8 @@ server/src/stripe.ts      the checkout seam, injectable transport
 server/src/webhook.ts     HMAC-SHA256 verification and event dispatch
 server/src/server.ts      the five routes
 server/src/audit.ts       one-line audit trail for every entitlement change
-server/test/              87 offline tests, including landing, README, and audit parity
+server/src/devices.ts     the device registry: hashed secrets, seats, persistence
+server/test/              104 offline tests, including landing, README, audit, and device parity
 landing/                  static page: index.html, landing.css, tokens.css, app.js
 docs/adr/                 the five decisions, each with what would change it
 docs/ELI5.md              what it is, for a ten-year-old

@@ -260,17 +260,34 @@ test("a paid record gets a bundle with addons and no credential", async () => {
     stripe: { fetch: fakeStripeFetch, secret: "sk_test_route" },
   });
   try {
-    const res = await fetch(`${paid.url}/api/bundle?email=paid@test`);
-    assert.equal(res.status, 200);
-    const bundle = await res.json();
-    assert.equal(bundle.tier, "household");
-    assert.equal(bundle.addons.length, 6);
-    assert.ok(Array.isArray(bundle.forced_filters));
-    assert.ok(bundle.expires_at);
-    const raw = JSON.stringify(bundle).toLowerCase();
-    for (const forbidden of ["token", "credential", "secret", "api_key"]) {
+    // First request registers the device and receives its secret once.
+    const first = await fetch(`${paid.url}/api/bundle?email=paid@test&device=Living+room`);
+    assert.equal(first.status, 200);
+    const issued = await first.json();
+    assert.equal(issued.tier, "household");
+    assert.equal(issued.addons.length, 6);
+    assert.ok(Array.isArray(issued.forced_filters));
+    assert.ok(issued.expires_at);
+    assert.ok(issued.device_id, "first contact must return a device id");
+    assert.ok(issued.device_secret, "first contact must return the secret");
+
+    // The addon payload itself still carries no credential.
+    const bundleWithoutDevice = { ...issued };
+    delete bundleWithoutDevice.device_id;
+    delete bundleWithoutDevice.device_secret;
+    const raw = JSON.stringify(bundleWithoutDevice).toLowerCase();
+    for (const forbidden of ["token", "credential", "api_key", "password"]) {
       assert.equal(raw.includes(forbidden), false, `bundle must not carry ${forbidden}`);
     }
+
+    // Second request with the secret does not consume another seat.
+    const second = await fetch(`${paid.url}/api/bundle?email=paid@test`, {
+      headers: { authorization: `Bearer ${issued.device_secret}` },
+    });
+    assert.equal(second.status, 200);
+    const again = await second.json();
+    assert.equal(again.device_id, issued.device_id);
+    assert.equal(again.device_secret, undefined, "the secret is shown once");
   } finally {
     await paid.close();
   }
@@ -392,6 +409,44 @@ test("an expired customer cannot pull a bundle, and can still pay again", async 
       body: JSON.stringify({ plan: "household", email: "lapsed@buy.test" }),
     });
     assert.equal(checkout.status, 200, "an expired customer must be able to renew");
+  } finally {
+    await inst.close();
+  }
+});
+
+test("a device secret from one email does not work for another", async () => {
+  const store = new EntitlementStore({ file: join(dir, "cross.json") });
+  for (const [email, plan] of [["a@x.test", "household"], ["b@x.test", "family"]] as const) {
+    await store.put({ email, plan, seats: 12, status: "active", valid_until: null });
+  }
+  const inst = await startServer(0, { store, stripe: { fetch: fakeStripeFetch, secret: "sk" } });
+  try {
+    const first = await fetch(`${inst.url}/api/bundle?email=a@x.test&device=TV`);
+    const { device_secret } = await first.json();
+
+    const cross = await fetch(`${inst.url}/api/bundle?email=b@x.test`, {
+      headers: { authorization: `Bearer ${device_secret}` },
+    });
+    assert.equal(cross.status, 401, "one device's secret must not serve another email");
+    assert.deepEqual(await cross.json(), { error: "invalid_device_secret" });
+  } finally {
+    await inst.close();
+  }
+});
+
+test("a full house refuses a new device with seat_limit_reached", async () => {
+  const store = new EntitlementStore({ file: join(dir, "seats.json") });
+  await store.put({ email: "cap@test", plan: "free", seats: 1, status: "free", valid_until: null });
+  // Give them one seat by making the plan household with 1 seat via the store.
+  await store.put({ email: "cap@test", plan: "family", seats: 1, status: "active", valid_until: null });
+  const inst = await startServer(0, { store, stripe: { fetch: fakeStripeFetch, secret: "sk" } });
+  try {
+    const first = await fetch(`${inst.url}/api/bundle?email=cap@test&device=TV`);
+    assert.equal(first.status, 200);
+
+    const second = await fetch(`${inst.url}/api/bundle?email=cap@test&device=Phone`);
+    assert.equal(second.status, 403, "the second device must not fit");
+    assert.deepEqual(await second.json(), { error: "seat_limit_reached" });
   } finally {
     await inst.close();
   }

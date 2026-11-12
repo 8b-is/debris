@@ -155,7 +155,9 @@ these and on nothing else:
 | 400 | `payload_too_large` | body over 64 KiB |
 | 400 | `read_failed` | the request body errored mid-read |
 | 400 | `read_timeout` | the body did not arrive within 10 s |
+| 401 | `invalid_device_secret` | a device secret was offered and did not match that email |
 | 402 | `payment_required` | bundle asked for a record that is free, lapsed, or past due |
+| 403 | `seat_limit_reached` | every seat is taken and the caller is not a known device |
 | 404 | `not_found` | unknown route |
 | 404 | `unknown_entitlement` | no ledger entry for that email |
 | 409 | `already_subscribed` | checkout asked for an email whose subscription is active |
@@ -222,19 +224,19 @@ The ADRs are accepted. The landing and the server are built to
 What is built: the entitlement ledger, the tier table, the addon manifest, the
 configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
 HMAC-verified webhooks that fail closed, an audit line for every entitlement change,
-and a restart that drains in-flight grants instead of dropping them. 87 tests,
+and a restart that drains in-flight grants instead of dropping them. 104 tests,
 offline.
 
-**Seats are advertised but not enforced.** `seats` is stored and served, and nothing
-counts devices against it, because no device has an identity. A household customer
-could attach forty devices and the API would answer every one. Device tokens fix this
-along with the authentication gap below.
+**Seats are now enforced, by device.** A device is one physical thing that asks for a
+bundle. The first request registers it and receives a secret once; later requests
+present it, and a reconnecting device does not cost a second seat. A household cap of
+twelve is refused at thirteen. The registry persists, so a restart does not burn a
+seat per device.
 
-**The entitlement and bundle routes have no authentication.** Anyone who knows a
-family member's email can read their plan and request a bundle in their name. The
-ledger holds no credential and a bundle carries none, but this is still an
-enumeration oracle, and it is why the service is not deployed anywhere. The reasoning
-and the expiry condition are in
+**`GET /api/entitlement` is still unauthenticated.** It takes an email and returns a
+record. `/api/bundle` now requires a device secret, but this route does not, so
+anyone who knows a family member's address can still read their plan. It is the last
+piece of the authentication gap, and it is what keeps this service on localhost. See
 [ADR 0005](docs/adr/0005-unauthenticated-until-deployed.md).
 
 What is not built: **the credential broker** — nothing in this service stores a
