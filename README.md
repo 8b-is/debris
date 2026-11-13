@@ -242,7 +242,9 @@ landing/app.js                tier CTAs and error rendering
 landing/lantern-mark.svg      the mark: stroke geometry, no gradient, no raster
 landing/favicon.svg/.ico      the mark simplified, plus a real 3-size .ico
 landing/hero.svg              the hero drawing: lantern, four nodes, one ledger
+landing/hero-static.svg       the same drawing with no SMIL, for reduced motion
 landing/og-image.html/.png    the 1200x630 social card, and its source
+landing/favicon.svg/.ico      (listed above; the .ico is generated, not committed by hand)
 ```
 
 ---

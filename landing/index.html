@@ -68,7 +68,17 @@
       </div>
     </div>
     <figure class="hero__art">
-      <img src="hero.svg" alt="A lantern at the centre, its light reaching four device nodes — a television, a phone, a tablet and a laptop — each connected by a hairline to a single ledger of seats." width="1200" height="700">
+      <!--
+        The animated drawing and the static one are separate files, not one file
+        with a CSS override. SMIL inside an <img> lives in its own document, so no
+        rule in this page's stylesheet can reach it: a reduced-motion query here
+        would have looked correct and done nothing. Swapping the source is the only
+        thing that actually stops it.
+      -->
+      <picture>
+        <source srcset="hero-static.svg" media="(prefers-reduced-motion: reduce)">
+        <img src="hero.svg" alt="A lantern at the centre, its light reaching four device nodes — a television, a phone, a tablet and a laptop — each connected by a hairline to a single ledger of seats." width="1200" height="700">
+      </picture>
     </figure>
   </section>
 

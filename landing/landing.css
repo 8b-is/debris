@@ -647,10 +647,6 @@ input:focus-visible,
   }
 }
 
-/* Pause the ambient hero drawing when the tab is not visible. */
-@media (prefers-reduced-motion: no-preference) {
-  body:not(:hover) .hero__art img {
-    /* no-op: the SVG animation itself is decorative and slow; the static frame
-       is complete without it */
-  }
-}
+/* The hero's ambient drawing is reduced-motion-aware by swapping the source, not
+   by a rule here: SMIL inside an <img> is a separate document and cannot be
+   reached from this stylesheet. See the <picture> in index.html. */
