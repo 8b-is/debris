@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="lantern">
+  <!-- lantern — the constellation ink. Stroke geometry only, no gradients, no glow.
+       The flame is the single gold accent; everything else is currentColor. -->
+  <g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- handle -->
+    <path d="M32 5v6"/>
+    <path d="M24 11h16"/>
+    <!-- cap -->
+    <path d="M21 15h22l-3 5H24z"/>
+    <!-- body -->
+    <path d="M22 20v26a4 4 0 0 0 4 4h12a4 4 0 0 0 4-4V20"/>
+    <!-- base -->
+    <path d="M19 50h26"/>
+    <path d="M23 55h18"/>
+  </g>
+  <!-- the light -->
+  <g fill="none" stroke="#e8b05c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M32 27c3.2 3.2 5 6.1 5 9a5 5 0 0 1-10 0c0-2.9 1.8-5.8 5-9z"/>
+  </g>
+</svg>

@@ -1,4 +1,4 @@
-# AGENTS.md — `8b-is-debris`
+# AGENTS.md — `lantern`
 
 A cache broker and an entitlement ledger. It holds a debrid credential, a curated
 addon manifest, and a list of who has paid. It does not hold media, relay bytes, or
@@ -8,7 +8,7 @@ Zero runtime dependencies. Node 26 runs the TypeScript sources directly through
 type stripping — there is no build step, no bundler, and no `node_modules`.
 
 ```bash
-cd ~/workspace/peterlodri-sec/8b-is-debris
+cd ~/workspace/peterlodri-sec/lantern
 scripts/verify.sh            # syntax check every source, then the whole suite
 node --test server/test/     # 138 tests, offline, no network
 node server/src/server.ts    # serves on PORT, default 8787

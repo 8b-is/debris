@@ -505,8 +505,8 @@ export function startServer(
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.PORT ?? DEFAULT_PORT);
   const instance = await startServer(port);
-  console.log(`debris: listening on ${instance.url}`);
-  console.log(`debris: stripe ${process.env.STRIPE_SECRET_KEY ? "configured" : "unconfigured"}`);
+  console.log(`lantern: listening on ${instance.url}`);
+  console.log(`lantern: stripe ${process.env.STRIPE_SECRET_KEY ? "configured" : "unconfigured"}`);
 
   // A webhook in flight is a grant in progress. Closing the listener and then
   // waiting for the open requests to finish is the difference between a restart
@@ -515,10 +515,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const shutdown = (signal: string): void => {
     if (shuttingDown) return;
     shuttingDown = true;
-    console.log(`debris: ${signal} received, draining`);
+    console.log(`lantern: ${signal} received, draining`);
 
     const force = setTimeout(() => {
-      console.log("debris: drain exceeded, forcing exit");
+      console.log("lantern: drain exceeded, forcing exit");
       process.exit(1);
     }, SHUTDOWN_GRACE_MS);
     force.unref?.();
@@ -526,11 +526,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     void instance.close().then(
       () => {
         clearTimeout(force);
-        console.log("debris: drained, closing");
+        console.log("lantern: drained, closing");
         process.exit(0);
       },
       (err: unknown) => {
-        console.error("debris: close failed", err);
+        console.error("lantern: close failed", err);
         process.exit(1);
       },
     );

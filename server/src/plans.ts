@@ -24,10 +24,11 @@ const FAMILY_FEATURES = [
   "HU+EN subtitles",
 ] as const;
 
+// Seats are not a feature: they are the `seats` field, rendered separately. Listing
+// "12 seats" here duplicated a value that already has one home.
 const HOUSEHOLD_FEATURES = [
   "everything in family",
   "YouTube addon",
-  "12 seats",
 ] as const;
 
 export const PLANS: Readonly<Record<PlanId, Plan>> = Object.freeze({
@@ -57,7 +58,7 @@ export const PLANS: Readonly<Record<PlanId, Plan>> = Object.freeze({
     name: "Patron",
     cents: 1900,
     seats: 24,
-    features: Object.freeze([...HOUSEHOLD_FEATURES, "24 seats"]),
+    features: Object.freeze(HOUSEHOLD_FEATURES),
   }),
 });
 

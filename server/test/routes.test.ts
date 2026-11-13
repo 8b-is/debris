@@ -24,7 +24,7 @@ let dir: string;
 let instance: DebrisServer;
 
 beforeEach(async () => {
-  dir = mkdtempSync(join(tmpdir(), "debris-route-"));
+  dir = mkdtempSync(join(tmpdir(), "lantern-route-"));
   delete process.env.STRIPE_SECRET_KEY;
   delete process.env.STRIPE_WEBHOOK_SECRET;
   const store = new EntitlementStore({ file: join(dir, "entitlements.json") });

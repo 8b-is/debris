@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>lantern — og image source (1200×630)</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  /* The OG card is a single fixed frame. No responsive behaviour: the size is the
+     contract, and anything that reflows here would break the crop. */
+  html, body { margin: 0; padding: 0; background: #05060a; }
+  .card {
+    position: relative;
+    width: 1200px;
+    height: 630px;
+    overflow: hidden;
+    background:
+      radial-gradient(760px 420px at 24% 44%, rgba(232,176,92,0.14) 0%, transparent 68%),
+      #05060a;
+    font-family: var(--mono);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 64px 72px;
+    box-sizing: border-box;
+  }
+  .top { display: flex; align-items: center; gap: 18px; }
+  .mark { display: flex; align-items: baseline; gap: 2px; font-size: 46px;
+          font-weight: 600; letter-spacing: -0.09em; line-height: 1; }
+  .mark .dot { color: #e8b05c; }
+  .mark .rest { color: var(--dim); letter-spacing: -0.04em; margin-left: 0.22em; }
+  .glyph { width: 52px; height: 52px; color: #cfc9dd; flex: none; }
+
+  .mid { display: flex; flex-direction: column; gap: 26px; }
+  h1 {
+    margin: 0;
+    font-size: 62px;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    font-weight: 600;
+    max-width: 20ch;
+    color: #cfc9dd;
+  }
+  .kicker {
+    margin: 0;
+    font-size: 13px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+  .lede {
+    margin: 0;
+    font-family: var(--serif);
+    font-size: 25px;
+    line-height: 1.6;
+    color: #7f7c99;
+    max-width: 62ch;
+  }
+
+  .tiers { display: flex; gap: 14px; align-items: flex-end; }
+  .tier {
+    border: 1px solid rgba(170,150,255,0.18);
+    border-radius: 14px;
+    padding: 16px 22px;
+    min-width: 168px;
+    background: rgba(255,255,255,0.02);
+  }
+  .tier.hot { border-color: rgba(232,176,92,0.35); }
+  .tier .name {
+    font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--dim); margin: 0 0 6px;
+  }
+  .tier .price {
+    font-size: 27px; font-weight: 600; letter-spacing: -0.02em; margin: 0;
+    color: #cfc9dd;
+  }
+  .tier .price span { font-size: 13px; color: var(--faint); font-weight: 400; }
+  .foot {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 13px; color: #5b577a; letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="top">
+    <img class="glyph" src="lantern-mark.svg" alt="">
+    <div class="mark">8b<span class="dot">.</span><span class="rest">lantern</span></div>
+  </div>
+
+  <div class="mid">
+    <p class="kicker">one setup · every device</p>
+    <h1>One streaming setup, configured once.</h1>
+    <p class="lede">A cache broker and an entitlement ledger for the family's streaming.
+      The bytes stay in the cache. We hold the configuration.</p>
+  </div>
+
+  <div class="tiers">
+    <div class="tier">
+      <p class="name">free</p>
+      <p class="price">€0</p>
+    </div>
+    <div class="tier">
+      <p class="name">family</p>
+      <p class="price">€4.90<span>/mo</span></p>
+    </div>
+    <div class="tier hot">
+      <p class="name">household</p>
+      <p class="price">€9.90<span>/mo</span></p>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>billed monthly, cancel any time</span>
+    <span>not a media host · no p2p by default</span>
+  </div>
+</div>
+</body>
+</html>

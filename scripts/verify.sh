@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /Users/lodripeter/workspace/peterlodri-sec/8b-is-debris
+cd /Users/lodripeter/workspace/peterlodri-sec/lantern
 echo "== syntax"
 for f in server/src/*.ts landing/app.js; do node --check "$f" || echo "FAIL $f"; done
 echo "== tests"

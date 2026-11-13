@@ -42,6 +42,19 @@ test("every landing tier exists in the server table with the same cents and seat
   }
 });
 
+test("landing tier features match the server table exactly", () => {
+  const tiers = landingTiers() as { id: string; features?: string[] }[];
+  for (const tier of tiers) {
+    const plan = PLANS[tier.id as keyof typeof PLANS];
+    assert.ok(plan, `landing tier ${tier.id} has no server counterpart`);
+    assert.deepEqual(
+      [...(tier.features ?? [])],
+      [...plan.features],
+      `${tier.id} features drifted between landing and server`,
+    );
+  }
+});
+
 test("the patron footnote price matches the server table", () => {
   const html = readFileSync(join(HERE, "..", "..", "landing", "index.html"), "utf8");
   const cents = PLANS.patron.cents;

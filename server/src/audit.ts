@@ -8,7 +8,7 @@
  * This is an audit trail, not telemetry: it is written to the process's own stdout,
  * never shipped anywhere, and it records no request bodies — only the event type,
  * the email, and the resulting plan. The landing makes no request beyond checkout
- * and nothing here phones home (README, "what debris never does").
+ * and nothing here phones home (README, "what lantern never does").
  */
 
 import { appendFileSync } from "node:fs";

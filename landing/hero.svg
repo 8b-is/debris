@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img"
+     aria-label="A lantern at the centre, with light reaching four device nodes: a television, a phone, a tablet, and a laptop.">
+  <defs>
+    <!-- The light cone: a soft radial wash, the only gradient on the page. -->
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e8b05c" stop-opacity="0.22"/>
+      <stop offset="55%" stop-color="#e8b05c" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#e8b05c" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Hairline used for every connection. -->
+    <style>
+      .hair { stroke: rgba(170,150,255,0.28); stroke-width: 1.25; fill: none; }
+      .node { stroke: #7f7c99; stroke-width: 1.5; fill: #0b0f19; }
+      .glyph { stroke: #cfc9dd; stroke-width: 1.75; fill: none;
+               stroke-linecap: round; stroke-linejoin: round; }
+      .lantern-body { stroke: #cfc9dd; stroke-width: 3; fill: none;
+                      stroke-linecap: round; stroke-linejoin: round; }
+      .flame { stroke: #e8b05c; stroke-width: 3; fill: none;
+               stroke-linecap: round; stroke-linejoin: round; }
+      .lbl { fill: #7f7c99; font: 500 13px ui-monospace, "SF Mono", Menlo, monospace;
+             letter-spacing: 0.18em; text-transform: uppercase; }
+      .ledger { stroke: rgba(98,230,201,0.55); stroke-width: 1.5; fill: none; }
+      .ledger-fill { fill: rgba(98,230,201,0.07); stroke: none; }
+    </style>
+  </defs>
+
+  <!-- ambient light -->
+  <circle cx="600" cy="330" r="290" fill="url(#glow)"/>
+
+  <!-- connections: lantern to each node, then each node to the ledger -->
+  <g class="hair">
+    <path d="M600 392 L236 214"/>
+    <path d="M600 392 L964 214"/>
+    <path d="M600 404 L300 520"/>
+    <path d="M600 404 L900 520"/>
+  </g>
+  <g class="hair" stroke-dasharray="3 5">
+    <path d="M236 258 L236 596 L520 596"/>
+    <path d="M964 258 L964 596 L680 596"/>
+    <path d="M300 566 L300 620 L520 620"/>
+    <path d="M900 566 L900 620 L680 620"/>
+  </g>
+
+  <!-- the lantern -->
+  <g transform="translate(600 300)">
+    <path class="lantern-body" d="M0 -66v-12"/>
+    <path class="lantern-body" d="M-14 -78h28"/>
+    <path class="lantern-body" d="M-19 -70h38l-5 8h-28z"/>
+    <path class="lantern-body" d="M-21 -58v52a7 7 0 0 0 7 7h28a7 7 0 0 0 7-7v-52"/>
+    <path class="lantern-body" d="M-26 8h52"/>
+    <path class="lantern-body" d="M-19 22h38"/>
+    <path class="flame" d="M0 -34c7 7 11 13.4 11 20a11 11 0 0 1-22 0c0-6.6 4-13 11-20z"/>
+  </g>
+
+  <!-- television -->
+  <g transform="translate(236 214)">
+    <rect class="node" x="-52" y="-34" width="104" height="66" rx="7"/>
+    <rect class="glyph" x="-40" y="-23" width="80" height="44" rx="3"/>
+    <path class="glyph" d="M-14 44h28"/>
+    <text class="lbl" x="0" y="70" text-anchor="middle">tv</text>
+  </g>
+
+  <!-- phone -->
+  <g transform="translate(964 214)">
+    <rect class="node" x="-23" y="-40" width="46" height="80" rx="8"/>
+    <rect class="glyph" x="-15" y="-29" width="30" height="52" rx="2"/>
+    <path class="glyph" d="M-5 32h10"/>
+    <text class="lbl" x="0" y="70" text-anchor="middle">phone</text>
+  </g>
+
+  <!-- tablet -->
+  <g transform="translate(300 520)">
+    <rect class="node" x="-42" y="-30" width="84" height="60" rx="7"/>
+    <rect class="glyph" x="-32" y="-21" width="64" height="42" rx="3"/>
+    <text class="lbl" x="0" y="58" text-anchor="middle">tablet</text>
+  </g>
+
+  <!-- laptop -->
+  <g transform="translate(900 520)">
+    <rect class="node" x="-46" y="-34" width="92" height="56" rx="6"/>
+    <rect class="glyph" x="-36" y="-25" width="72" height="38" rx="2"/>
+    <path class="glyph" d="M-54 34h108"/>
+    <text class="lbl" x="0" y="60" text-anchor="middle">laptop</text>
+  </g>
+
+  <!-- the ledger: one bar per seat, mint -->
+  <g transform="translate(600 596)">
+    <rect class="ledger-fill" x="-80" y="-24" width="160" height="48" rx="10"/>
+    <rect class="ledger" x="-80" y="-24" width="160" height="48" rx="10"/>
+    <g class="ledger" stroke-width="4" stroke-linecap="round">
+      <path d="M-58 0h116"/>
+    </g>
+    <g fill="#62e6c9" stroke="none">
+      <rect x="-58" y="-6" width="4" height="12" rx="2"/>
+      <rect x="-46" y="-6" width="4" height="12" rx="2"/>
+      <rect x="-34" y="-6" width="4" height="12" rx="2"/>
+      <rect x="-22" y="-6" width="4" height="12" rx="2"/>
+      <rect x="-10" y="-6" width="4" height="12" rx="2"/>
+    </g>
+    <text class="lbl" x="0" y="46" text-anchor="middle" fill="#5b577a">seats</text>
+  </g>
+
+  <!-- ambient drift: slow, and cancelled under reduced motion by the page's CSS -->
+  <g class="hair" opacity="0.5">
+    <circle cx="452" cy="150" r="1.6" fill="#b48bff" stroke="none">
+      <animate attributeName="opacity" values="0.15;0.7;0.15" dur="22s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="742" cy="122" r="1.4" fill="#00f0ff" stroke="none">
+      <animate attributeName="opacity" values="0.6;0.15;0.6" dur="26s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="856" cy="352" r="1.5" fill="#b48bff" stroke="none">
+      <animate attributeName="opacity" values="0.15;0.55;0.15" dur="19s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+</svg>

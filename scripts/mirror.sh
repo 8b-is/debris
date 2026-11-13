@@ -5,14 +5,14 @@
 # leaves the forges disagreeing, which is worse than not trying.
 #
 #   scripts/mirror.sh              push main to both
-#   DEBRIS_BRANCH=x scripts/mirror.sh
+#   LANTERN_BRANCH=x scripts/mirror.sh
 #
 # Both forges are equal. Neither is authoritative.
 set -euo pipefail
 
-GH="${DEBRIS_GH:-https://github.com/8b-is/debris.git}"
-CB="${DEBRIS_CB:-git@codeberg-peterlodri-sec:8b-is/debris.git}"
-BRANCH="${DEBRIS_BRANCH:-main}"
+GH="${LANTERN_GH:-https://github.com/8b-is/lantern.git}"
+CB="${LANTERN_CB:-git@codeberg-peterlodri-sec:8b-is/lantern.git}"
+BRANCH="${LANTERN_BRANCH:-main}"
 
 say() { printf '  %s\n' "$*"; }
 
@@ -23,7 +23,7 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
     exit 1
 fi
 
-echo "debris mirror · branch $BRANCH"
+echo "lantern mirror · branch $BRANCH"
 say "github   $GH"
 say "codeberg $CB"
 
@@ -44,13 +44,13 @@ if [ "$fail" -ne 0 ]; then
 
 Not pushing: at least one forge is unreachable.
 
-  github    https://github.com/8b-is/debris
-  codeberg  https://codeberg.org/8b-is/debris
+  github    https://github.com/8b-is/lantern
+  codeberg  https://codeberg.org/8b-is/lantern
             create with:
             curl -X POST https://codeberg.org/api/v1/orgs/8b-is/repos \
               -H "Authorization: token $CODEBERG_TOKEN" \
               -H 'Content-Type: application/json' \
-              -d '{"name":"debris","private":false,"default_branch":"main"}'
+              -d '{"name":"lantern","private":false,"default_branch":"main"}'
 EOF
     exit 1
 fi

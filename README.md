@@ -1,10 +1,10 @@
-# 8b.is — debris
+# 8b.is — lantern
 
 **A cache broker and an entitlement ledger for one family's streaming setup.**
 Not a media host. Not a proxy. Configuration as the product.
 
 ```
-debris
+lantern
   ├── keeps the entitlement ledger           (who paid, how many seats)
   ├── curates the addon manifest             (data, not releases)
   └── brokers a configuration bundle         (per device, expiring, no credential)
@@ -24,7 +24,7 @@ different subtitle languages, and nobody knows which one is current. The bytes a
 not the problem — a debrid cache already has them. The problem is that
 configuration is stored in nine places and edited in none of them.
 
-debris moves the configuration to one place and makes the *manifest* the artifact.
+lantern moves the configuration to one place and makes the *manifest* the artifact.
 The cache stays the debrid provider's job, because they are better at it than we
 would be and it is not a cost this family should carry.
 
@@ -56,7 +56,7 @@ an annualised saving.
 ## how it works
 
 1. **One debrid account.** The family holds a Real-Debrid or TorBox account. When
-   the credential broker lands, the token goes into debris once, server-side, and
+   the credential broker lands, the token goes into lantern once, server-side, and
    never reaches a device. Until then the token stays in the client, which is the
    arrangement this service exists to replace.
 2. **One manifest.** The allowed addons, the preferred filters (`[8B+]` / `[RD+]`
@@ -72,13 +72,13 @@ Supported clients: Stremio on macOS, Windows, Linux, Android, Android TV, iOS
 
 ---
 
-## what debris never does
+## what lantern never does
 
 This is the part worth reading twice.
 
 - **No media hosting.** Not a byte of media is stored here.
 - **No P2P by default.** The bundle asks for cached-only streams. Whether a device
-  honours that is up to the client, which is not code in this repo: debris can state
+  honours that is up to the client, which is not code in this repo: lantern can state
   the rule but cannot enforce it on a player it does not control. A client that
   ignores `cached_only` is not a supported client.
 - **No ads.** There is nothing to advertise against; we are not in the attention
@@ -190,7 +190,7 @@ a sentence, not a property.
 
 ## what is deliberately absent
 
-- **The proxy data path.** debris brokers credentials and configuration; it does
+- **The proxy data path.** lantern brokers credentials and configuration; it does
   not relay bytes. That is a documented seam, not shipped code.
 - **Media storage and transcoding.** Neither is in scope, and neither will be.
 - **A database.** Entitlements are a JSON file with atomic writes. That is the
@@ -312,8 +312,8 @@ does not need**.
 
 | Forge | URL | State |
 |---|---|---|
-| GitHub | <https://github.com/8b-is/debris> | live |
-| Codeberg | <https://codeberg.org/8b-is/debris> | live |
+| GitHub | <https://github.com/8b-is/lantern> | live |
+| Codeberg | <https://codeberg.org/8b-is/lantern> | live |
 
 Both carry the same `main`, and neither is authoritative over the other.
 
@@ -323,4 +323,4 @@ scripts/mirror.sh        # reachability check, then push both, then print all th
 
 ---
 
-*8b.is · debris · fine touch from within · AGPL-3.0-only*
+*8b.is · lantern · fine touch from within · AGPL-3.0-only*

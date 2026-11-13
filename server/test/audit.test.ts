@@ -12,7 +12,7 @@ let dir: string;
 let log: string;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "debris-audit-"));
+  dir = mkdtempSync(join(tmpdir(), "lantern-audit-"));
   log = join(dir, "audit.ndjson");
   process.env.DEBRIS_AUDIT_LOG = log;
 });

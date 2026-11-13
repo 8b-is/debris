@@ -93,8 +93,8 @@ export async function createCheckoutSession(
   form.set("mode", "subscription");
   form.set("customer_email", email);
   form.set("client_reference_id", plan.id);
-  form.set("success_url", "https://8b.is/debris/?checkout=ok");
-  form.set("cancel_url", "https://8b.is/debris/?checkout=cancelled");
+  form.set("success_url", "https://8b.is/lantern/?checkout=ok");
+  form.set("cancel_url", "https://8b.is/lantern/?checkout=cancelled");
   form.set("line_items[0][quantity]", "1");
   form.set("line_items[0][price]", priceIdFor(plan.id, deps));
   form.set("subscription_data[metadata][plan]", plan.id);

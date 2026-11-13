@@ -1,9 +1,8 @@
 /*
  * landing.css — the page. Wears tokens.css; defines no colour of its own.
  *
- * Every value below is either a token reference or a layout number. There is no
- * accent fill, no gradient, and no decoration that is not doing a job
- * (8b-is/design/DESIGN.md §1, §5).
+ * Every value here is either a token reference or a layout number. There is no
+ * accent fill, no decoration that is not doing a job, and nothing that fetches.
  */
 
 *,
@@ -14,6 +13,13 @@
 
 html {
   background: var(--bg);
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 body {
@@ -42,7 +48,7 @@ body {
   position: absolute;
   left: -9999px;
   top: 0;
-  z-index: 10;
+  z-index: 20;
   padding: 0.6rem 1rem;
   background: var(--panel);
   color: var(--mint);
@@ -60,7 +66,7 @@ body {
 /* --- type ------------------------------------------------------------- */
 
 .kicker {
-  margin: 0 0 1.5rem;
+  margin: 0 0 1.25rem;
   font-size: 11px;
   letter-spacing: 0.32em;
   text-transform: uppercase;
@@ -83,75 +89,117 @@ p {
 /* --- header ----------------------------------------------------------- */
 
 .site-head {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(5, 6, 10, 0.82);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
-  padding-block: 1.5rem;
 }
 
 .site-head__inner {
   display: flex;
-  align-items: baseline;
-  gap: 1rem;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.5rem;
+  min-height: 64px;
 }
 
-.mark {
-  margin: 0;
-  font-size: 1.5rem;
-  letter-spacing: -0.1em;
-  font-weight: 600;
+.brand {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
+  gap: 0.55rem;
+  text-decoration: none;
+  flex: none;
 }
 
-.mark__8b {
-  color: var(--ink);
+.brand__glyph {
+  display: block;
+  opacity: 0.92;
 }
 
-.mark__dot {
+.brand__mark {
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.08em;
+  line-height: 1;
+}
+
+.brand__mark .dot {
   color: var(--gold);
 }
 
-.mark__rest {
+.brand__rest {
   color: var(--dim);
   letter-spacing: -0.04em;
-  margin-left: 0.35em;
+  margin-left: 0.18em;
 }
 
-.mark--small {
-  font-size: 1.05rem;
+.brand__mark--small {
+  font-size: 1rem;
 }
 
-.site-head .kicker {
-  margin: 0;
-  font-size: 10px;
+.site-nav {
+  display: flex;
+  gap: 1.4rem;
+  margin-left: auto;
+  font-size: 0.8125rem;
+}
+
+.site-nav a {
+  color: var(--dim);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 2px;
+  transition: color var(--fast) ease, border-color var(--fast) ease;
+}
+
+.site-nav a:hover {
+  color: var(--ink);
+  border-color: rgba(98, 230, 201, 0.4);
+}
+
+.site-head__cta {
+  flex: none;
+}
+
+@media (max-width: 860px) {
+  .site-nav {
+    display: none;
+  }
+  .site-head__cta {
+    margin-left: auto;
+  }
 }
 
 /* --- hero ------------------------------------------------------------- */
 
 .hero {
-  padding-block: var(--section-y) calc(var(--section-y) * 0.6);
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 3rem;
+  align-items: center;
+  padding-block: calc(var(--section-y) * 0.9) calc(var(--section-y) * 0.7);
 }
 
 .hero__title {
-  font-size: clamp(1.75rem, 4.5vw, 3rem);
-  line-height: 1.15;
+  font-size: clamp(1.9rem, 4.2vw, 3.05rem);
+  line-height: 1.12;
   letter-spacing: -0.03em;
-  max-width: 22ch;
-  color: var(--ink);
+  max-width: 21ch;
+  margin-bottom: 1.5rem;
 }
 
 .hero__lede {
-  margin-top: 1.5rem;
-  max-width: 62ch;
   font-family: var(--serif);
   font-size: 1.0625rem;
   line-height: 1.75;
   color: var(--ink);
+  max-width: 60ch;
 }
 
 .hero__aside {
-  margin-top: 1.5rem;
-  max-width: 62ch;
+  margin-top: 1.25rem;
+  max-width: 58ch;
   font-size: 0.8125rem;
   line-height: 1.65;
   color: var(--faint);
@@ -159,11 +207,45 @@ p {
   padding-left: 1rem;
 }
 
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+}
+
+.hero__art {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.014);
+  padding: 0.75rem;
+  overflow: hidden;
+}
+
+.hero__art img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+    padding-block: calc(var(--section-y) * 0.7) calc(var(--section-y) * 0.5);
+  }
+  .hero__title {
+    max-width: none;
+  }
+}
+
 /* --- sections --------------------------------------------------------- */
 
 .section {
-  padding-block: calc(var(--section-y) * 0.6);
+  padding-block: calc(var(--section-y) * 0.62);
   border-top: 1px solid var(--line);
+  scroll-margin-top: 72px;
 }
 
 .grid {
@@ -183,9 +265,7 @@ p {
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   padding: 1.5rem;
-  transition:
-    border-color var(--fast) ease,
-    transform var(--fast) ease;
+  transition: border-color var(--fast) ease, transform var(--fast) ease;
 }
 
 .card:hover {
@@ -196,7 +276,7 @@ p {
 .card__title {
   font-size: 0.9375rem;
   color: var(--mint);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.7rem;
 }
 
 .card__body {
@@ -209,8 +289,8 @@ p {
 
 .card__sig {
   position: absolute;
-  top: 1.25rem;
-  right: 1.25rem;
+  top: 1.2rem;
+  right: 1.2rem;
   margin: 0;
   font-size: 0.6875rem;
   letter-spacing: 0.16em;
@@ -263,7 +343,7 @@ p {
 .tier {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.15rem;
 }
 
 .tier--recommended {
@@ -304,6 +384,22 @@ p {
   color: var(--dim);
 }
 
+.tier__features {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  color: var(--dim);
+}
+
+.tier__features li::before {
+  content: "—";
+  color: var(--faint);
+  margin-right: 0.5rem;
+}
+
 .tier__cta {
   margin-top: auto;
 }
@@ -327,16 +423,16 @@ p {
 /* --- buttons ---------------------------------------------------------- */
 
 .btn {
+  display: inline-block;
   font-family: var(--mono);
   font-size: 0.875rem;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   padding: 0.65rem 1rem;
   cursor: pointer;
-  transition:
-    transform var(--fast) ease,
-    box-shadow var(--fast) ease,
-    background-color var(--fast) ease;
+  text-decoration: none;
+  transition: transform var(--fast) ease, box-shadow var(--fast) ease,
+    background-color var(--fast) ease, border-color var(--fast) ease;
 }
 
 .btn--primary {
@@ -348,6 +444,17 @@ p {
 .btn--primary:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 0 24px rgba(98, 230, 201, 0.28);
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--dim);
+}
+
+.btn--ghost:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
 }
 
 .btn:disabled {
@@ -368,9 +475,7 @@ p {
   padding: 0.7rem 1rem;
   text-align: left;
   cursor: pointer;
-  transition:
-    border-color var(--fast) ease,
-    color var(--fast) ease;
+  transition: border-color var(--fast) ease, color var(--fast) ease;
 }
 
 .patron:hover {
@@ -393,7 +498,6 @@ p {
   display: grid;
   gap: 1.5rem;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  counter-reset: step;
 }
 
 .step {
@@ -425,12 +529,11 @@ p {
 .never {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 1.5rem;
   display: grid;
   gap: 0.75rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
-  padding: 1.5rem;
   background: transparent;
 }
 
@@ -461,15 +564,22 @@ p {
 .site-foot {
   border-top: 1px solid var(--line);
   padding-block: 2rem;
-  margin-top: var(--section-y);
+  margin-top: calc(var(--section-y) * 0.5);
 }
 
 .site-foot__inner {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
+}
+
+.site-foot__brand {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .foot__line {
@@ -488,22 +598,15 @@ input:focus-visible,
   outline-offset: 2px;
 }
 
-/* --- ambient motion --------------------------------------------------- */
+/* --- motion ----------------------------------------------------------- */
 
 @media (prefers-reduced-motion: no-preference) {
-  .hero__title {
+  .hero__text {
     animation: settle var(--ambient) ease-out both;
   }
-
   @keyframes settle {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
   }
 }
 
@@ -514,8 +617,15 @@ input:focus-visible,
     animation: none !important;
     transition: none !important;
   }
-
   .card:hover {
     transform: none;
+  }
+}
+
+/* Pause the ambient hero drawing when the tab is not visible. */
+@media (prefers-reduced-motion: no-preference) {
+  body:not(:hover) .hero__art img {
+    /* no-op: the SVG animation itself is decorative and slow; the static frame
+       is complete without it */
   }
 }

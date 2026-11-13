@@ -14,7 +14,7 @@ let dir: string;
 let store: EntitlementStore;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "debris-hook-"));
+  dir = mkdtempSync(join(tmpdir(), "lantern-hook-"));
   store = new EntitlementStore({ file: join(dir, "entitlements.json") });
 });
 

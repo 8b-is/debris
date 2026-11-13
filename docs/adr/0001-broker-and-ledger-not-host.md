@@ -1,4 +1,4 @@
-# ADR 0001 — debris is a broker and a ledger, never a host
+# ADR 0001 — lantern is a broker and a ledger, never a host
 
 **Status:** accepted
 **Date:** 2026-11-12
@@ -31,7 +31,7 @@ We take the second.
 
 ## Decision
 
-debris holds exactly three things and nothing else.
+lantern holds exactly three things and nothing else.
 
 1. **A credential broker.** The debrid token lives server-side. Clients receive
    short-lived configuration bundles, never the token itself. The token can be
@@ -42,7 +42,7 @@ debris holds exactly three things and nothing else.
 3. **An entitlement ledger.** Who has paid, at what tier, and how many device
    seats that buys.
 
-debris does not store media, does not transcode, does not relay bytes, and does
+lantern does not store media, does not transcode, does not relay bytes, and does
 not run a proxy data path. It is a configuration service with a payment gate.
 
 ## Consequences

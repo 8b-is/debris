@@ -19,7 +19,7 @@ let dir: string;
 let file: string;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "debris-store-"));
+  dir = mkdtempSync(join(tmpdir(), "lantern-store-"));
   file = join(dir, "nested", "entitlements.json");
 });
 

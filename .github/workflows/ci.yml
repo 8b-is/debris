@@ -1,4 +1,4 @@
-name: debris CI
+name: lantern CI
 
 on:
   push:

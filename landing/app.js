@@ -10,9 +10,30 @@
  */
 
 const TIERS = Object.freeze([
-  Object.freeze({ id: "free", name: "Free", cents: 0, seats: 1, recommended: false }),
-  Object.freeze({ id: "family", name: "Family", cents: 490, seats: 5, recommended: false }),
-  Object.freeze({ id: "household", name: "Household", cents: 990, seats: 12, recommended: true }),
+  Object.freeze({
+    id: "free",
+    name: "Free",
+    cents: 0,
+    seats: 1,
+    recommended: false,
+    features: Object.freeze(["no configuration bundle", "no subtitles"]),
+  }),
+  Object.freeze({
+    id: "family",
+    name: "Family",
+    cents: 490,
+    seats: 5,
+    recommended: false,
+    features: Object.freeze(["configuration bundle", "cached-only streams", "HU+EN subtitles"]),
+  }),
+  Object.freeze({
+    id: "household",
+    name: "Household",
+    cents: 990,
+    seats: 12,
+    recommended: true,
+    features: Object.freeze(["everything in family", "YouTube addon"]),
+  }),
 ]);
 
 const CHECKOUT_URL = "/api/checkout";
@@ -31,7 +52,11 @@ function tierMarkup(tier) {
   const badge = tier.recommended
     ? ' <span class="pill pill--gold">most families</span>'
     : "";
-  const price = tier.cents === 0 ? "free" : `${formatPrice(tier.cents)}<span class="per">/mo</span>`;
+  const price =
+    tier.cents === 0 ? "free" : `${formatPrice(tier.cents)}<span class="per">/mo</span>`;
+  const features = tier.features.length
+    ? `<ul class="tier__features">${tier.features.map((f) => `<li>${f}</li>`).join("")}</ul>`
+    : "";
   return `
       <article class="card tier${tier.recommended ? " tier--recommended" : ""}" data-tier="${tier.id}">
         <div class="tier__head">
@@ -39,6 +64,7 @@ function tierMarkup(tier) {
           <p class="tier__price">${price}</p>
           <p class="tier__seats">${tier.seats} ${tier.seats === 1 ? "seat" : "seats"}</p>
         </div>
+        ${features}
         <button class="btn btn--primary tier__cta" type="button" data-plan="${tier.id}">choose ${tier.name}</button>
       </article>`;
 }
