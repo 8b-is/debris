@@ -42,6 +42,20 @@ body {
   padding-inline: var(--pad);
 }
 
+/* --- contrast ----------------------------------------------------------
+ *
+ * The constellation ink's --faint (#5b577a) is 2.98:1 on the canvas and 2.82:1 on
+ * a panel — below the 4.5:1 AA floor for body-size text. It is fine for a 1px
+ * hairline and useless for a sentence. Everywhere this page sets *text* in --faint
+ * it uses --faint-text instead: #8380ad, 5.16:1 on a panel and still the quietest
+ * voice on the page. --dim (#7f7c99) is 4.91:1 composited and stays as it is.
+ * Hairlines keep --line. Measured over the whole page, the worst text style is
+ * 4.91:1; every one clears AA.
+ */
+:root {
+  --faint-text: #8380ad;
+}
+
 /* --- skip link -------------------------------------------------------- */
 
 .skip {
@@ -108,6 +122,7 @@ p {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
+  min-height: 44px;
   text-decoration: none;
   flex: none;
 }
@@ -118,6 +133,7 @@ p {
 }
 
 .brand__mark {
+  color: var(--ink);
   font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: -0.08em;
@@ -146,10 +162,14 @@ p {
 }
 
 .site-nav a {
+  display: inline-flex;
+  align-items: center;
+  /* 44px is the touch-target floor: a link that is 11px tall is a link that gets
+     missed on a phone, and the nav is hidden there anyway — but tablets see it. */
+  min-height: 44px;
   color: var(--dim);
   text-decoration: none;
   border-bottom: 1px solid transparent;
-  padding-bottom: 2px;
   transition: color var(--fast) ease, border-color var(--fast) ease;
 }
 
@@ -202,7 +222,7 @@ p {
   max-width: 58ch;
   font-size: 0.8125rem;
   line-height: 1.65;
-  color: var(--faint);
+  color: var(--faint-text);
   border-left: 1px solid var(--line-strong);
   padding-left: 1rem;
 }
@@ -294,7 +314,7 @@ p {
   margin: 0;
   font-size: 0.6875rem;
   letter-spacing: 0.16em;
-  color: var(--faint);
+  color: var(--faint-text);
 }
 
 /* --- pricing ---------------------------------------------------------- */
@@ -325,13 +345,13 @@ p {
 }
 
 .checkout-form__input::placeholder {
-  color: var(--faint);
+  color: var(--faint-text);
 }
 
 .checkout-form__hint {
   margin: 0;
   font-size: 0.75rem;
-  color: var(--faint);
+  color: var(--faint-text);
 }
 
 .checkout-form__alert {
@@ -373,7 +393,7 @@ p {
 
 .per {
   font-size: 0.8125rem;
-  color: var(--faint);
+  color: var(--faint-text);
   letter-spacing: 0;
   margin-left: 0.2em;
 }
@@ -396,7 +416,7 @@ p {
 
 .tier__features li::before {
   content: "—";
-  color: var(--faint);
+  color: var(--faint-text);
   margin-right: 0.5rem;
 }
 
@@ -429,8 +449,12 @@ p {
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   padding: 0.65rem 1rem;
+  min-height: 44px;
   cursor: pointer;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: transform var(--fast) ease, box-shadow var(--fast) ease,
     background-color var(--fast) ease, border-color var(--fast) ease;
 }
@@ -473,6 +497,7 @@ p {
   font-family: var(--mono);
   font-size: 0.8125rem;
   padding: 0.7rem 1rem;
+  min-height: 44px;
   text-align: left;
   cursor: pointer;
   transition: border-color var(--fast) ease, color var(--fast) ease;
@@ -486,7 +511,7 @@ p {
 .hedge {
   margin: 1rem 0 0;
   font-size: 0.75rem;
-  color: var(--faint);
+  color: var(--faint-text);
 }
 
 /* --- steps ------------------------------------------------------------ */
@@ -543,7 +568,7 @@ p {
   align-items: baseline;
   font-family: var(--serif);
   font-size: 0.9375rem;
-  color: var(--faint);
+  color: var(--faint-text);
   line-height: 1.65;
 }
 
@@ -553,7 +578,7 @@ p {
   font-size: 0.625rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--faint);
+  color: var(--faint-text);
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   padding: 0.1rem 0.45rem;
@@ -585,7 +610,7 @@ p {
 .foot__line {
   margin: 0;
   font-size: 0.75rem;
-  color: var(--faint);
+  color: var(--faint-text);
 }
 
 /* --- focus ------------------------------------------------------------ */

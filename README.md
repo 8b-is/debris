@@ -141,17 +141,31 @@ is the whole reason the duplication is safe.
 
 ## the API
 
+Public:
+
 ```
 GET  /healthz                      200 {ok, version, uptime_s}
 GET  /api/plans                    200 {plans:[{id,name,cents,seats,features}]}
-GET  /api/bundle?email=            200 {tier,seats,addons,subtitle_languages,forced_filters,expires_at,...}
-GET  /api/devices?email=           200 {email,seats,used,devices:[{id,name,created_at,last_seen_at}]}
-DELETE /api/devices?id=           200 {revoked,id}   (Authorization: Bearer <device secret>)
-POST /api/devices/sweep?email=     200 {swept,ids}    reclaim seats from stale devices
 POST /api/checkout   {plan, email} 200 {url, session_id}
 POST /api/webhook                  Stripe events, HMAC-SHA256 verified
-GET  /api/entitlement?email=       200 {email,plan,seats,status,valid_until,device}   (Bearer <device secret>)
 ```
+
+Device-facing. `/api/bundle` registers a device on first contact and returns its
+secret once; later calls present `Authorization: Bearer <device secret>`. A
+first-time device must also pass the family enrolment code as `&enrolment=`.
+
+```
+GET    /api/bundle?email=&device=&enrolment=
+                                   200 {tier,seats,addons,subtitle_languages,forced_filters,expires_at,device_id,device_secret?}
+GET    /api/entitlement?email=    200 {email,plan,seats,status,valid_until,device}   (Bearer <device secret>)
+GET    /api/devices?email=        200 {email,seats,used,devices:[{id,name,created_at,last_seen_at}]}   (no auth: inventory only)
+DELETE /api/devices?id=           200 {revoked,id}        (Bearer <device secret>)
+POST   /api/devices/sweep?email=  200 {swept,ids}         (reclaim seats from devices unseen for 90 days)
+```
+
+There is no route that returns a credential, and `GET /api/entitlement` never
+returns the enrolment hash: it was a password-equivalent, and it is the reason that
+route is authenticated.
 
 Every error is `{error: "<string>"}`. The complete set — a client may branch on
 these and on nothing else:
@@ -195,15 +209,12 @@ a sentence, not a property.
 
 ## what is deliberately absent
 
-- **The proxy data path.** lantern brokers credentials and configuration; it does
-  not relay bytes. That is a documented seam, not shipped code.
-- **Media storage and transcoding.** Neither is in scope, and neither will be.
-- **A database.** Entitlements are a JSON file with atomic writes. That is the
-  correct size of solution for a family.
-- **A VM, an LSP, an MCP surface.** There is no language here and no agent surface;
-  adding one would be inventing work.
-
----
+- **The proxy data path.** lantern brokers configuration and entitlements; it does not
+  relay bytes. A documented seam, not shipped code.
+- **Media storage and transcoding.** Out of scope, permanently.
+- **A database.** A JSON file with atomic writes is the right size for a family.
+- **A VM, an LSP, an MCP surface.** There is no language here, so there is nothing for
+  one to serve.
 
 ## layout
 
@@ -222,7 +233,7 @@ server/src/stripe.ts          the checkout seam, injectable transport
 server/src/manifest.ts        the addon catalogue and the device bundle
 server/src/audit.ts           one-line audit trail per entitlement change
 server/src/webhook.ts         HMAC verification and event dispatch
-server/src/server.ts          the five routes, plus graceful drain
+server/src/server.ts          the nine route registrations, plus graceful drain
 server/test/                  87 offline tests, including README and landing parity
 landing/index.html            the page, with Open Graph and Twitter metadata
 landing/landing.css           layout and components; defines no colour of its own
@@ -238,82 +249,49 @@ landing/og-image.html/.png    the 1200x630 social card, and its source
 
 ## status
 
-The ADRs are accepted. The landing and the server are built to
-[`plans/SPEC.md`](plans/SPEC.md).
+Built and tested. 139 tests, offline, no network, no runtime dependencies.
 
-What is built: the entitlement ledger, the tier table, the addon manifest, the
-configuration bundle (`GET /api/bundle`), Stripe checkout behind one seam, and
-HMAC-verified webhooks that fail closed, an audit line for every entitlement change,
-and a restart that drains in-flight grants instead of dropping them. 138 tests,
-offline.
+| area | state |
+|---|---|
+| entitlement ledger | atomic JSON writes, fsync before rename, survives restart |
+| tier table | four tiers, integer cents, the only place a price is declared |
+| addon manifest | six addons, cached-only flagged, served inside the bundle |
+| configuration bundle | per device, expires in one hour, never carries a credential |
+| Stripe checkout | one injectable seam, real HMAC webhook, fails closed |
+| device registry | hashed secrets, one seat per device, persists across restart |
+| audit trail | one NDJSON line per entitlement and device change |
+| graceful shutdown | drains in-flight grants before exit |
 
-**A new device must prove it belongs to the family.** Knowing an email is not proof:
-without this, anyone could fill every seat with junk and lock the family's own
-television out. The first subscription grant prints a one-time enrolment code; a
-device registering for the first time passes it as `&enrolment=`. It is stored hashed,
-like a device secret, and never shown again.
+Four things are worth knowing before you trust it with a family:
 
-**Seats are now enforced, by device.** A device is one physical thing that asks for a
-bundle. The first request registers it and receives a secret once; later requests
-present it, and a reconnecting device does not cost a second seat. A household cap of
-twelve is refused at thirteen. The registry persists, so a restart does not burn a
-seat per device.
+**A new device must prove it belongs.** Knowing an email is not proof — without the
+enrolment code, anyone could fill every seat with junk and lock the family's own
+television out. The first grant prints a one-time code, stored hashed, never shown
+again.
 
-**Seats can be listed and freed.** `GET /api/devices?email=` shows which devices hold
-seats and when each was last seen; `DELETE /api/devices?id=` with that device's secret
-releases one, so a lost phone does not hold a seat forever. Both are audited, and the
-audit line now names the device.
-
-**Seats are reclaimed, not just freed.** `POST /api/devices/sweep` drops any device
-unseen for 90 days, so a phone sold in spring does not hold a seat at Christmas. It
-runs on request, never on a read: a family away for a month comes home to its
-devices still registered.
+**Renewals extend; cancellations release.** `invoice.paid` and
+`invoice.payment_succeeded` move the expiry forward; ending a subscription releases
+that family's devices and keeps the code, so resubscribing works with the same one.
 
 **A replayed webhook is a no-op, but a failed one is retryable.** Stripe delivers at
-least once, and a grant is not idempotent: re-running it minted a fresh enrolment code
-and silently invalidated the one the family had already been given. Processed event ids
-are recorded, so a redelivery is acknowledged and dropped. If the work *fails*, the claim
-is released so Stripe's retry can still land — marking a failed event as done would take
-the customer's money and grant nothing. The event log's own writes are serialised and
-cannot take the process down: a full disk costs idempotency, not the service.
+least once, so processed event ids are recorded. A grant that throws releases its
+claim, so the retry can still land — otherwise a full disk would take the money and
+grant nothing.
 
-**Renewals extend the period.** The expiry was written once at grant and never extended,
-so a customer who kept paying was locked out after one month. `invoice.paid` and
-`invoice.payment_succeeded` are now handled and extend from the invoice date, which
-keeps the period exactly one month long and self-corrects after downtime.
+**`/api/bundle` is rate limited.** A sha256 per request plus an fsync per new device
+is work an anonymous caller should not be able to schedule. Burst 20, sustained 5 per
+second per address, 429 over the line. Not a defence against guessing an enrolment
+code, which is 50 bits and not the threat.
 
-**Cancelling releases the seats.** A cancelled subscription used to leave its devices
-registered, so a family that paid again got a new enrolment code and found their seats
-already occupied by devices nobody could identify. Ending a subscription now releases
-that family's devices — and only that family's — while keeping the code, so resubscribing
-with the same code works and the seats are free.
+Not built: **the credential broker** — nothing here stores a debrid token yet, and
+the bundle has no token field, so the day it lands it cannot leak through by accident.
+Also not here: a real Stripe account, a real debrid token, a deployed instance, and
+a device identity for `GET /api/devices` (inventory only, no auth, no secrets). Those
+are operator steps, not code. See
+[ADR 0005](docs/adr/0005-unauthenticated-until-deployed.md) for the deployment gate.
 
-**`/api/bundle` is rate limited.** Each request hashes, and a first-time device also
-writes to disk and fsyncs, so an uncapped caller chooses how much work the service
-does. A token bucket allows a burst of 20 and a sustained 5 per second per address,
-refilling proportionally; a caller over the line gets 429. It is not a defence against
-guessing an enrolment code, which is 50 bits and not the threat.
-
-**Two taps in the same second make one session.** The active-subscription check and
-the Stripe call are not atomic, so a per-email in-flight guard turns the second into a
-409 rather than a second charge.
-
-**No route is unauthenticated any more.** `GET /api/entitlement` was the last one: it
-returned the raw record, which after the enrolment work included the enrolment hash —
-a password-equivalent, readable by anyone who knew an email, and enough to register
-devices on the account. It now requires a device secret and returns only the plan,
-seats, status, expiry, and the asking device's own name. See
-[ADR 0005](docs/adr/0005-unauthenticated-until-deployed.md).
-
-What is not built: **the credential broker** — nothing in this service stores a
-debrid token yet. The bundle is the shape it will hand out, and the bundle
-deliberately has no token field, so the day the credential store lands it cannot
-leak through the bundle by accident. Also not here: a real Stripe account, a real
-debrid token, and a deployed instance. Those are operator steps, not code.
-
-The three things this service will be judged on, in order: **the webhook does not
-fail open**, **a price is never a float**, and **the landing makes no request it
-does not need**.
+Three things this will be judged on, in order: **the webhook does not fail open**,
+**a price is never a float**, and **the landing makes no request it does not need**.
 
 ---
 

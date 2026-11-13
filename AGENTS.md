@@ -10,7 +10,7 @@ type stripping — there is no build step, no bundler, and no `node_modules`.
 ```bash
 cd ~/workspace/peterlodri-sec/lantern
 scripts/verify.sh            # syntax check every source, then the whole suite
-node --test server/test/     # 138 tests, offline, no network
+node --test server/test/     # 139 tests, offline, no network
 node server/src/server.ts    # serves on PORT, default 8787
 ```
 
@@ -104,11 +104,11 @@ server/src/manifest.ts    the addon catalogue and the device bundle
 server/src/store.ts       entitlement ledger, atomic tmp+rename writes
 server/src/stripe.ts      the checkout seam, injectable transport
 server/src/webhook.ts     HMAC-SHA256 verification and event dispatch
-server/src/server.ts      the five routes
+server/src/server.ts      the nine route registrations
 server/src/audit.ts       one-line audit trail for every entitlement change
 server/src/devices.ts     the device registry: hashed secrets, seats, persistence
 server/src/ratelimit.ts   per-caller token bucket for the expensive route
-server/test/              138 offline tests, including landing, README, audit, and device parity
+server/test/              139 offline tests, including landing, README, audit, and device parity
 landing/                  static page: index.html, landing.css, tokens.css, app.js
 docs/adr/                 the five decisions, each with what would change it
 docs/ELI5.md              what it is, for a ten-year-old
