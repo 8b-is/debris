@@ -1,7 +1,12 @@
 # 8b.is — lantern
 
-**A cache broker and an entitlement ledger for one family's streaming setup.**
+**One streaming setup, configured once, held for the whole family.**
+
+Lantern curates which addons are allowed and which filters to prefer, brokers a
+short-lived configuration bundle to each device, and keeps one entitlement ledger.
 Not a media host. Not a proxy. Configuration as the product.
+
+![lantern — a lantern lighting four device nodes, each connected to one ledger of seats](landing/hero.svg)
 
 ```
 lantern
@@ -219,10 +224,14 @@ server/src/audit.ts           one-line audit trail per entitlement change
 server/src/webhook.ts         HMAC verification and event dispatch
 server/src/server.ts          the five routes, plus graceful drain
 server/test/                  87 offline tests, including README and landing parity
-landing/index.html            the page
+landing/index.html            the page, with Open Graph and Twitter metadata
 landing/landing.css           layout and components; defines no colour of its own
 landing/tokens.css            constellation ink, copied with provenance
 landing/app.js                tier CTAs and error rendering
+landing/lantern-mark.svg      the mark: stroke geometry, no gradient, no raster
+landing/favicon.svg/.ico      the mark simplified, plus a real 3-size .ico
+landing/hero.svg              the hero drawing: lantern, four nodes, one ledger
+landing/og-image.html/.png    the 1200x630 social card, and its source
 ```
 
 ---
